@@ -1,0 +1,40 @@
+<!-- VRTE -->
+      <div id="pv" class="panel">
+        <div class="ph"><div class="pt">Controle de VRTE</div><div class="ps">Entradas, débitos e análise de consumo</div></div>
+        <div class="mcs" id="vm"></div>
+        <!-- gráfico + consumo por op -->
+        <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-bottom:14px">
+          <div class="card" style="margin-bottom:0">
+            <div class="ch" style="margin-bottom:6px">
+              <span class="ct">Entradas vs saídas (6 meses)</span>
+              <div style="display:flex;gap:10px;font-size:10px;color:var(--t2)">
+                <span><span style="display:inline-block;width:10px;height:10px;background:var(--gn2);border-radius:2px;margin-right:3px"></span>Entradas</span>
+                <span><span style="display:inline-block;width:10px;height:10px;background:var(--rd2);border-radius:2px;margin-right:3px"></span>Saídas</span>
+              </div>
+            </div>
+            <div id="v-grafico" style="display:flex;gap:5px;align-items:flex-end;height:90px;padding:0 4px"></div>
+          </div>
+          <div class="card" style="margin-bottom:0">
+            <div class="ch" style="margin-bottom:8px"><span class="ct">Consumo por operação</span></div>
+            <div id="v-op"></div>
+          </div>
+        </div>
+        <!-- resumo mensal -->
+        <div class="card">
+          <div class="ch"><span class="ct">Resumo mensal</span></div>
+          <div class="tw"><table><thead><tr><th>Mês</th><th>Entradas</th><th>Saídas</th><th>Saldo do período</th></tr></thead><tbody id="v-tmeses"></tbody></table></div>
+        </div>
+        <!-- registrar entrada -->
+        <div class="card"><div class="ch"><span class="ct">Registrar entrada de VRTE</span></div>
+          <div class="fr">
+            <div class="fg"><label>Data</label><input type="date" id="vd"/></div>
+            <div class="fg"><label>Quantidade</label><input type="number" id="vq" placeholder="Ex: 500" min="1"/></div>
+          </div>
+          <div class="fg"><label>Observação</label><input type="text" id="vo" placeholder="Ex: Lote referência abril/2026"/></div>
+          <div class="alert aok" id="va">Entrada registrada!</div>
+          <div class="ar2"><button class="btn bp" onclick="regVRTE()">Registrar entrada</button></div>
+        </div>
+        <div class="card"><div class="ch"><span class="ct">Histórico completo</span></div>
+          <div class="tw"><table><thead><tr><th>Data</th><th>Tipo</th><th>Qtd</th><th>Saldo após</th><th>Referência</th></tr></thead><tbody id="vtb"></tbody></table></div>
+        </div>
+      </div>

@@ -1,0 +1,60 @@
+<!-- NOVA ESCALA -->
+      <div id="pn" class="panel">
+        <div class="ph"><div class="pt">Nova escala ISEO</div><div class="ps">Preencha e gere o documento</div></div>
+        <div class="card"><div class="ch"><span class="ct">1. Dados gerais</span></div>
+          <div class="fr">
+            <div class="fg"><label>Operação (ISEO) <span style="color:var(--rd);font-weight:600">*</span></label>
+              <select id="eo" onchange="updVN();preencherMunOp();toggleOpOutra()"><option value="">— Selecione a operação —</option></select>
+              <input type="text" id="eo-outro" placeholder="Descreva a operação" style="display:none;margin-top:6px" oninput="updVN()"/>
+            </div>
+            <div class="fg"><label>Data da escala</label><input type="date" id="ed"/></div>
+          </div>
+          <div class="fr">
+            <div class="fg"><label>Município / UF</label>
+              <select id="em" onchange="toggleMunOutra('em','em-outro')">
+                <option value="Colatina / ES">Colatina / ES</option>
+                <option value="Marilândia / ES">Marilândia / ES</option>
+                <option value="__outra__">Outra...</option>
+              </select>
+              <input type="text" id="em-outro" placeholder="Descreva o município" style="display:none;margin-top:6px"/>
+            </div>
+            <div class="fg"><label>Duração</label>
+              <select id="edu" onchange="updVN()">
+                <option value="">Selecione...</option>
+                <option value="6">6 horas — debita 80 VRTE</option>
+                <option value="8">8 horas — debita 100 VRTE</option>
+                <option value="12">12 horas — debita 120 VRTE</option>
+              </select>
+            </div>
+          </div>
+          <div id="vnotice" class="vn" style="display:none"></div>
+        </div>
+
+        <div class="card"><div class="ch"><span class="ct">2. Turnos e locais</span></div>
+          <div id="tc"></div>
+          <button class="btn" onclick="addTurno()" style="margin-top:4px">+ Adicionar turno / local</button>
+        </div>
+
+        <div class="card"><div class="ch"><span class="ct">3. Assinatura</span></div>
+          <div class="fg"><label>Selecionar assinante cadastrado</label>
+            <select id="ass-sel" onchange="selecionarAss()">
+              <option value="">— selecione —</option>
+            </select>
+          </div>
+          <div class="fr">
+            <div class="fg"><label>Nome e posto</label><input type="text" id="ean" placeholder="Ex: THALYSON ELEOTÉRIO TRESMANN – 1º TEN QOCPM"/></div>
+            <div class="fg"><label>RG / NF</label><input type="text" id="ear" placeholder="Ex: RG 25.862-1 / NF 4304834"/></div>
+          </div>
+          <div class="fg"><label>Cargo</label><input type="text" id="eac" placeholder="Ex: COMANDANTE DA 1ª CIA/8º BPM"/></div>
+        </div>
+
+        <div class="alert aok" id="ea">Escala salva!</div>
+        <div class="alert aer" id="eae"></div>
+        <div class="ar2">
+          <button class="btn" onclick="prevEsc()">Pré-visualizar</button>
+          <button class="btn brd" onclick="gerarPDF()">Baixar PDF</button>
+          <button class="btn bg2" onclick="gerarDocx()">Baixar DOCX</button>
+          <button class="btn bp" onclick="salvarEsc()">Salvar escala</button>
+        </div>
+        <div id="parea"></div>
+      </div>

@@ -1,0 +1,43 @@
+<!-- MILITARES -->
+      <div id="pm" class="panel">
+        <div class="ph"><div class="pt">Militares</div><div class="ps">Cadastro e histórico por militar</div></div>
+        <div class="card"><div class="ch"><span class="ct">Cadastrar militar</span></div>
+          <div class="fr3">
+            <div class="fg"><label>Posto / Grad.</label>
+              <select id="mpo">
+                <option>Cap QOCPM</option><option>1º Ten QOC</option><option>2º Ten QOC</option><option>Asp Of PM</option>
+                <option>SubTen QPMP-C</option><option>1º Sgt QPMP-C</option><option>2º Sgt QPMP-C</option>
+                <option>3º Sgt QPMP-C</option><option>Cb QPMP-C</option><option>Sd QPMP-C</option>
+              </select>
+            </div>
+            <div class="fg"><label>Nome completo</label><input type="text" id="mno" placeholder="Nome completo"/></div>
+            <div class="fg"><label>RG</label><input type="text" id="mrg" placeholder="Ex: 23.990-2"/></div>
+          </div>
+          <div class="fr">
+            <div class="fg"><label>NF</label><input type="text" id="mnf" placeholder="Ex: 3589048"/></div>
+            <div class="fg"><label>Função padrão</label><select id="mfu"><option>Patrulheiro</option><option>Motorista</option><option>Comandante</option></select></div>
+          </div>
+          <div class="alert aok" id="ma">Militar cadastrado!</div>
+          <div class="ar2"><button class="btn bp" onclick="salvarMil()">Cadastrar</button></div>
+        </div>
+        <div class="card"><div class="ch" style="flex-wrap:wrap;gap:8px">
+            <span class="ct">Histórico por militar</span>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <input type="text" id="mil-busca" placeholder="Buscar..." style="font-size:12px;padding:5px 10px;border:1px solid var(--b);border-radius:var(--r);background:var(--s2);width:180px" oninput="filtrarMils()"/>
+              <select id="mil-filtro-tipo" onchange="filtrarMils()" style="font-size:12px;padding:5px 8px;border:1px solid var(--b);border-radius:var(--r);background:var(--s2)">
+                <option value="todos">Todos</option>
+                <option value="verde">Última: Verde (seg–qui)</option>
+                <option value="vermelha">Última: Vermelha (sex–dom)</option>
+                <option value="sem">Sem histórico</option>
+              </select>
+            </div>
+          </div>
+          <!-- legenda -->
+          <div style="display:flex;gap:14px;margin-bottom:10px;font-size:11px;color:var(--t2)">
+            <span><span style="display:inline-block;width:10px;height:10px;background:var(--gn2);border:1px solid var(--gn);border-radius:2px;margin-right:4px"></span>Escala verde = seg a qui</span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:var(--rd2);border:1px solid var(--rd);border-radius:2px;margin-right:4px"></span>Escala vermelha = sex, sáb, dom</span>
+            <span><span style="color:var(--rd);font-weight:600">⚠</span> = 3+ vermelhas seguidas</span>
+          </div>
+          <div id="ml2"></div>
+        </div>
+      </div>

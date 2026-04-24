@@ -1,0 +1,30 @@
+<!-- PAINEL -->
+      <div id="pp" class="panel on">
+        <div class="ph"><div class="pt">Painel geral</div><div class="ps" id="dd"></div></div>
+        <!-- alertas -->
+        <div id="d-alertas" style="margin-bottom:12px;display:none"></div>
+        <!-- métricas -->
+        <div class="mcs" id="dm"></div>
+        <!-- gráfico + ranking -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          <div class="card" style="margin-bottom:0">
+            <div class="ch" style="margin-bottom:10px"><span class="ct">Escalas por mês</span></div>
+            <div id="d-barras" style="display:flex;gap:4px;align-items:flex-end;height:80px;padding:0 4px"></div>
+          </div>
+          <div class="card" style="margin-bottom:0">
+            <div class="ch" style="margin-bottom:8px"><span class="ct">Ranking do mês</span></div>
+            <div id="d-ranking"></div>
+          </div>
+        </div>
+        <!-- vrte por operação + escalas recentes -->
+        <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:14px;margin-bottom:14px">
+          <div class="card" style="margin-bottom:0">
+            <div class="ch" style="margin-bottom:8px"><span class="ct">VRTE por operação</span></div>
+            <div id="d-opvrte"></div>
+          </div>
+          <div class="card" style="margin-bottom:0">
+            <div class="ch"><span class="ct">Últimas escalas</span><button class="btn bp bsm" onclick="nav('nova',document.querySelectorAll('.ni')[3])">+ Nova</button></div>
+            <div class="tw"><table><thead><tr><th>Data</th><th>Operação</th><th>Dur.</th><th>VRTE</th><th>Mils</th><th>Tipo</th></tr></thead><tbody id="dtb"></tbody></table></div>
+          </div>
+        </div>
+      </div>

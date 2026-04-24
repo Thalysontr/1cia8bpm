@@ -1,0 +1,26 @@
+<!-- OPERAÇÕES -->
+      <div id="po" class="panel">
+        <div class="ph"><div class="pt">Operações (ISEO)</div><div class="ps">Cadastre as operações em vigor</div></div>
+        <div class="card"><div class="ch"><span class="ct">Cadastrar operação</span></div>
+          <div class="fr">
+            <div class="fg"><label>Nome da operação</label><input type="text" id="on2" placeholder="Ex: FORÇA E PRESENÇA"/></div>
+            <div class="fg"><label>Município / UF</label>
+              <select id="om" onchange="toggleMunOutra('om','om-outro')">
+                <option value="Colatina / ES">Colatina / ES</option>
+                <option value="Marilândia / ES">Marilândia / ES</option>
+                <option value="__outra__">Outra...</option>
+              </select>
+              <input type="text" id="om-outro" placeholder="Descreva o município" style="display:none;margin-top:6px"/>
+            </div>
+          </div>
+          <div class="fr">
+            <div class="fg"><label>Data de início</label><input type="date" id="oi"/></div>
+            <div class="fg"><label>Status</label><select id="ost"><option>Ativa</option><option>Encerrada</option></select></div>
+          </div>
+          <div class="fg"><label>Missão / descrição</label><textarea id="od" placeholder="Fazer saturação nos bairros..."></textarea></div>
+          <div class="fg"><label>Número da ordem (opcional)</label><input type="text" id="oord" placeholder="Ex: ORDEM DE OPERAÇÃO Nº 008/2026"/></div>
+          <div class="alert aok" id="oa">Operação salva!</div>
+          <div class="ar2"><button class="btn bp" onclick="salvarOp()">Salvar operação</button></div>
+        </div>
+        <div class="card"><div class="ch"><span class="ct">Operações cadastradas</span></div><div id="ol"></div></div>
+      </div>
