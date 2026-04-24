@@ -1,12 +1,12 @@
 // ═══ ASSINANTES ═══
 function updSelAss(){
   var s=document.getElementById('ass-sel');s.innerHTML='<option value="">— selecione —</option>';
-  DB.assinantes.forEach((a,i)=>{var o=document.createElement('option');o.value=i;o.textContent=a.nome;s.appendChild(o);});
+  APP.assinantes.forEach((a,i)=>{var o=document.createElement('option');o.value=i;o.textContent=a.nome;s.appendChild(o);});
 }
 function selecionarAss(){
   var i=document.getElementById('ass-sel').value;
   if(i==='')return;
-  var a=DB.assinantes[parseInt(i)];
+  var a=APP.assinantes[parseInt(i)];
   document.getElementById('ean').value=a.nome;
   document.getElementById('ear').value=a.rg;
   document.getElementById('eac').value=a.cargo;
@@ -14,11 +14,15 @@ function selecionarAss(){
 function salvarAss(){
   var n=document.getElementById('assn').value.trim(),r=document.getElementById('assr').value.trim(),c=document.getElementById('assc').value.trim();
   if(!n)return alert('Informe o nome.');
-  var as=DB.assinantes;as.push({nome:n,rg:r,cargo:c});DB.assinantes=as;
+  var as=APP.assinantes.slice();as.push({nome:n,rg:r,cargo:c});
+  DB.saveAssinantes(as,function(){ reloadAss(function(){ show('assa');updSelAss();rCfg(); }); });
   document.getElementById('assn').value='';document.getElementById('assr').value='';document.getElementById('assc').value='';
-  show('assa');updSelAss();rCfg();
 }
-function delAss(i){if(!confirm('Excluir?'))return;var as=DB.assinantes;as.splice(i,1);DB.assinantes=as;updSelAss();rCfg();}
+function delAss(i){
+  if(!confirm('Excluir?'))return;
+  var as=APP.assinantes.slice();as.splice(i,1);
+  DB.saveAssinantes(as,function(){ reloadAss(function(){ updSelAss();rCfg(); }); });
+}
 
 // ═══ NOVA ESCALA – TURNOS ═══
 var TC=0,TURNOS=[];
@@ -32,10 +36,13 @@ function rNova(){
   document.querySelector('.ca').scrollTop=0;
 }
 function loadAss(){
-  var c=DB._l('cfg')||{};
-  if(c.an)document.getElementById('ean').value=c.an;
-  if(c.ar)document.getElementById('ear').value=c.ar;
-  if(c.ac)document.getElementById('eac').value=c.ac;
+  FBDB.collection('config').doc('ultimo_assinante').get().then(function(doc){
+    if(!doc.exists)return;
+    var c=doc.data();
+    if(c.an)document.getElementById('ean').value=c.an;
+    if(c.ar)document.getElementById('ear').value=c.ar;
+    if(c.ac)document.getElementById('eac').value=c.ac;
+  });
 }
 
 function addTurno(){
@@ -110,7 +117,7 @@ function filtrarBusca(i){
   var q=document.getElementById('msearch'+i).value.trim().toLowerCase();
   var dd=document.getElementById('mdd'+i);
   if(!q){dd.innerHTML='';dd.classList.remove('open');return;}
-  var res=DB.mils.filter(m=>m.nome.toLowerCase().includes(q)||m.rg.includes(q)).slice(0,8);
+  var res=APP.mils.filter(m=>m.nome.toLowerCase().includes(q)||m.rg.includes(q)).slice(0,8);
   if(!res.length){dd.innerHTML='<div class="mil-dd-item" style="color:var(--t3)">Nenhum militar encontrado</div>';dd.classList.add('open');return;}
   dd.innerHTML=res.map(m=>`<div class="mil-dd-item" onclick="selecionarMilBusca(${i},'${m.rg}')"><div class="mil-dd-name">${m.posto} — ${m.nome}</div><div class="mil-dd-info">RG: ${m.rg} · NF: ${m.nf} · ${m.func}</div></div>`).join('');
   dd.classList.add('open');
@@ -118,7 +125,7 @@ function filtrarBusca(i){
 function abrirDD(i){var q=document.getElementById('msearch'+i).value.trim();if(q)filtrarBusca(i);}
 function fecharDD(i){var dd=document.getElementById('mdd'+i);if(dd)dd.classList.remove('open');}
 function selecionarMilBusca(i,rg){
-  var m=DB.mils.find(function(x){return x.rg===rg;});if(!m)return;
+  var m=APP.mils.find(function(x){return x.rg===rg;});if(!m)return;
   var t=TURNOS.find(function(t){return t.i===i;});
   var ord=t.mils.length+1;
   t.mils.push({ord:ord,po:m.posto,no:m.nome,rg:m.rg,nf:m.nf,fu:m.func});
@@ -179,7 +186,7 @@ function updVN(){
     var vPorMil=VM[dur];
     var nmils=TURNOS.reduce(function(s,t){return s+(t.mils?t.mils.length:0);},0);
     var total=vPorMil*(nmils||1);
-    var s=DB.vrte.saldo,w=s<total;
+    var s=APP.vrte.saldo,w=s<total;
     el.className='vn'+(w?' warn':'');el.style.display='flex';
     var msg='Taxa: '+vPorMil+' VRTE/militar × '+(nmils||'?')+' militares = '+total+' VRTE. Saldo: '+s.toLocaleString('pt-BR')+' → após: '+(s-total).toLocaleString('pt-BR');
     el.textContent=msg+(w?' ⚠ SALDO INSUFICIENTE!':'');
@@ -234,19 +241,37 @@ function salvarEsc(){
   var err=validEsc();
   if(err){var el=document.getElementById('eae');el.textContent=err;el.style.display='block';setTimeout(()=>el.style.display='none',3000);return;}
   var d=getDados();
-  var escs=DB.escs;escs.push(d);DB.escs=escs;
-  var v=DB.vrte;v.saldo-=d.vrte;v.hist.push({d:d.data,t:'S',q:-d.vrte,s:v.saldo,r:'Escala — '+d.op});DB.vrte=v;
-  var ms=DB.mils;
-  d.turnos.forEach(t=>t.mils.forEach(m=>{var f=ms.find(x=>x.rg===m.rg);if(f){f.hist=f.hist||[];f.hist.push({data:d.data,op:d.op,tipo:tipoEscala(d.data)});}}));
-  DB.mils=ms;
-  DB._s('cfg',{an:d.an,ar:d.ar,ac:d.ac});
+  // Salvar escala
+  DB.saveEsc(d,function(){
+    reloadEscs(function(){});
+  });
+  // Atualizar VRTE
+  var v=APP.vrte;
+  v.saldo-=d.vrte;
+  v.hist.push({d:d.data,t:'S',q:-d.vrte,s:v.saldo,r:'Escala — '+d.op});
+  DB.saveVrte(v,function(){ reloadVrte(function(){}); });
+  // Atualizar histórico dos militares
+  var ms=APP.mils;
+  d.turnos.forEach(function(t){
+    t.mils.forEach(function(m){
+      var f=ms.find(function(x){return x.rg===m.rg;});
+      if(f){
+        f.hist=f.hist||[];
+        f.hist.push({data:d.data,op:d.op,tipo:tipoEscala(d.data)});
+        DB.updateMilHist(f.rg,f.hist,function(){});
+      }
+    });
+  });
+  reloadMils(function(){});
+  // Salvar assinante padrão na config
+  FBDB.collection('config').doc('ultimo_assinante').set({an:d.an,ar:d.ar,ac:d.ac});
   show('ea');updVN();
 }
 
 // ═══ BUILDER DE TEXTO ═══
 function buildTxt(d){
   var df=new Date(d.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric',weekday:'long'}).toUpperCase();
-  var op=DB.ops.find(o=>o.nome===d.op)||{};
+  var op=APP.ops.find(o=>o.nome===d.op)||{};
   var miss=op.desc||'Fazer saturação nos bairros com planejamento específico de ações repressivas, locais sensíveis com alto índice de violência, tráfico, dentre outros delitos.';
   var l=['GOVERNO DO ESTADO DO ESPÍRITO SANTO','POLÍCIA MILITAR','OITAVO BATALHÃO','"Policial Militar, herói protetor da sociedade"',''];
   l.push('ISEO – '+d.op);
@@ -285,7 +310,7 @@ function prevEsc(){
 }
 function gerarPDF(d){
   if(!d){var err=validEsc();if(err){alert(err);return;}d=getDados();}
-  var op=DB.ops.find(function(o){return o.nome===d.op;})||{};
+  var op=APP.ops.find(function(o){return o.nome===d.op;})||{};
   var miss=op.desc||'Fazer satura\u00e7\u00e3o nos bairros com planejamento espec\u00edfico de a\u00e7\u00f5es repressivas, locais sens\u00edveis com alto \u00edndice de viol\u00eancia, tr\u00e1fico, dentre outros delitos';
   var df=new Date(d.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric',weekday:'long'}).toUpperCase();
   var dfc=new Date(d.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
@@ -445,7 +470,7 @@ function mkTurnoXML(t,og,miss){
 function gerarDocx(d){
   if(!d){var err=validEsc();if(err){alert(err);return;}d=getDados();}
   if(typeof JSZip==='undefined'){alert('JSZip não carregou. Use o botão PDF.');return;}
-  var op=DB.ops.find(function(o){return o.nome===d.op;})||{};
+  var op=APP.ops.find(function(o){return o.nome===d.op;})||{};
   var miss=op.desc||'Fazer saturação nos bairros com planejamento específico de ações repressivas, locais sensíveis com alto índice de violência, tráfico, dentre outros delitos';
   var df=new Date(d.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric',weekday:'long'}).toUpperCase();
   var dfc=new Date(d.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});

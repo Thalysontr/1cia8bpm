@@ -1,6 +1,6 @@
 // ═══ PAINEL ═══
 function rPainel(){
-  var v=DB.vrte,e=DB.escs,mils=DB.mils;
+  var v=APP.vrte,e=APP.escs,mils=APP.mils;
   var hoje=new Date();
   var mesAtual=hoje.getMonth(),anoAtual=hoje.getFullYear();
   var em=e.filter(function(x){var d=new Date(x.data+'T12:00:00');return d.getMonth()===mesAtual&&d.getFullYear()===anoAtual;});
