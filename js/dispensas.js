@@ -107,15 +107,17 @@ function rDisp() {
     '        <div class="fg"><label>Turno</label><select id="df-turno"><option value="DIURNO">DIURNO</option><option value="NOITE">NOITE</option></select></div>',
     '      </div>',
     '      <div class="fr">',
-    '        <div class="fg"><label>Nome do militar *</label>',
-    '          <input id="df-nome" type="text" placeholder="Ex: SGT FERRAZ" list="disp-list-mils"/>',
-    '          <datalist id="disp-list-mils">' +
-              (APP.mils || []).map(function(m){
-                return '<option value="' + (m.posto||'') + ' ' + (m.nome||'').split(' ')[0] + '">';
+    '        <div class="fg"><label>Nome do militar *</label>' +
+    '          <select id="df-nome" onchange="_autoFillNf(this.value)" style="padding:9px 12px;border:1.5px solid var(--b);border-radius:var(--r);font-family:var(--fn);font-size:13px;background:var(--s);color:var(--t)">' +
+    '            <option value="">— Selecione o militar —</option>' +
+              (APP.mils || []).slice().sort(function(a,b){return (a.posto+a.nome).localeCompare(b.posto+b.nome);}).map(function(m){
+                var label = (m.posto||'') + ' — ' + (m.nome||'');
+                var val   = JSON.stringify({nome: (m.posto||'') + ' ' + (m.nome||'').split(' ')[0].toUpperCase(), nf: m.nf||''});
+                return '<option value=\'' + val.replace(/'/g,"\\'") + '\'>' + label + '</option>';
               }).join('') +
-    '          </datalist>',
+    '          </select>' +
     '        </div>',
-    '        <div class="fg"><label>NF</label><input id="df-nf" type="number" placeholder="Ex: 874775"/></div>',
+    '        <div class="fg"><label>NF</label><input id="df-nf" type="number" placeholder="Preenchido automaticamente" readonly style="background:var(--s2);color:var(--t3)"/></div>',
     '      </div>',
     '      <div class="fg"><label>Fundamento / Solicitação *</label>',
     '        <input id="df-solic" type="text" placeholder="Ex: ASSIDUIDADE / BGPM 025 DE 18/06/2025" list="disp-list-solic"/>',
@@ -223,14 +225,27 @@ function _rListaDisp() {
 // ═══════════════════════════════════════════════════════════════
 // FORM — ABRIR / FECHAR / PREENCHER
 // ═══════════════════════════════════════════════════════════════
+function _autoFillNf(val) {
+  if (!val) return;
+  try {
+    var obj = JSON.parse(val);
+    var nfEl = document.getElementById('df-nf');
+    if (nfEl) nfEl.value = obj.nf || '';
+  } catch(e) {}
+}
+
 function _abrirFormDisp() {
   _dEditId = null;
   document.getElementById('disp-modal-titulo').textContent = 'Nova Dispensa';
   var hoje = new Date();
   var mesVal = hoje.getFullYear() + '-' + String(hoje.getMonth()+1).padStart(2,'0');
-  ['df-mes','df-turno','df-nome','df-nf','df-solic','df-edocs',
+  ['df-mes','df-turno','df-solic','df-edocs',
    'df-datasol','df-quant','df-totalanual','df-inicio','df-termino','df-obs']
     .forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  var selNome = document.getElementById('df-nome');
+  if (selNome) selNome.value = '';
+  var nfEl = document.getElementById('df-nf');
+  if (nfEl) nfEl.value = '';
   document.getElementById('df-mes').value   = mesVal;
   document.getElementById('df-turno').value = 'DIURNO';
   document.getElementById('disp-modal').style.display = 'flex';
@@ -247,7 +262,18 @@ function _editarDisp(edocs) {
 
   document.getElementById('df-mes').value          = mesInput;
   document.getElementById('df-turno').value        = d.turno || 'DIURNO';
-  document.getElementById('df-nome').value         = d.nome || '';
+  // Tenta encontrar a opção do select que corresponde ao militar pelo NF
+  var selNome = document.getElementById('df-nome');
+  if (selNome) {
+    var found = false;
+    for (var i = 0; i < selNome.options.length; i++) {
+      try {
+        var obj = JSON.parse(selNome.options[i].value);
+        if (String(obj.nf) === String(d.nf)) { selNome.selectedIndex = i; found = true; break; }
+      } catch(e) {}
+    }
+    if (!found) selNome.value = '';
+  }
   document.getElementById('df-nf').value           = d.nf || '';
   document.getElementById('df-solic').value        = d.solicitacao || '';
   document.getElementById('df-edocs').value        = d.edocs || '';
@@ -278,15 +304,24 @@ function _salvarFormDisp() {
 
   var edocs = g('df-edocs').trim();
   if (!edocs) return alert('Informe o número e-Docs.');
-  var nome  = g('df-nome').trim().toUpperCase();
-  if (!nome)  return alert('Informe o nome do militar.');
+  // Pega nome e NF do select
+  var selNome = document.getElementById('df-nome');
+  var nome = '', nfVal = null;
+  if (selNome && selNome.value) {
+    try {
+      var obj = JSON.parse(selNome.value);
+      nome   = obj.nome || '';
+      nfVal  = parseInt(obj.nf) || null;
+    } catch(e) {}
+  }
+  if (!nome) return alert('Selecione o militar.');
 
   var dados = {
     edocs:          edocs,
     mes:            mes,
     turno:          g('df-turno'),
-    nome:           nome,
-    nf:             parseInt(g('df-nf')) || null,
+    nome:           nome.toUpperCase(),
+    nf:             nfVal,
     solicitacao:    g('df-solic').toUpperCase(),
     dataSolicitada: g('df-datasol'),
     quantDias:      parseInt(g('df-quant')) || 0,
