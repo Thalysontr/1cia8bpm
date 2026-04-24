@@ -194,25 +194,30 @@ var DB = {
   },
 
   // ── DISPENSAS ─────────────────────────────────────────────────
+  // Documentos indexados pelo campo edocs (ex: "2026-F7N5QB")
   getDisps: function(cb) {
     if (_CACHE.disps) { cb(_CACHE.disps); return; }
-    FBDB.collection('dispensas').orderBy('data','desc').get().then(function(snap) {
+    FBDB.collection('dispensas').get().then(function(snap) {
       var list = [];
       snap.forEach(function(d) { list.push(d.data()); });
+      // ordenar por inicio decrescente em memória
+      list.sort(function(a,b){ return (b.inicio||'').localeCompare(a.inicio||''); });
       _CACHE.disps = list;
       cb(list);
     });
   },
 
   saveDisp: function(disp, cb) {
-    FBDB.collection('dispensas').doc(String(disp.id)).set(disp).then(function() {
+    // usa edocs como ID do documento — garante idempotência
+    var docId = String(disp.edocs || disp.id || Date.now());
+    FBDB.collection('dispensas').doc(docId).set(disp).then(function() {
       _CACHE.disps = null;
       if (cb) cb();
     });
   },
 
-  deleteDisp: function(id, cb) {
-    FBDB.collection('dispensas').doc(String(id)).delete().then(function() {
+  deleteDisp: function(edocs, cb) {
+    FBDB.collection('dispensas').doc(String(edocs)).delete().then(function() {
       _CACHE.disps = null;
       if (cb) cb();
     });
