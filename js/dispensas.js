@@ -32,6 +32,23 @@ function _mesLabel(m) {
   return nomes[+p[0]] + '/' + p[1];
 }
 
+function _fmtNomeMil(nome, nf) {
+  // Tenta encontrar o militar no banco pelo NF para exibir completo
+  var mil = (APP.mils||[]).find(function(m){ return String(m.nf) === String(nf); });
+  if (mil) {
+    return '<div style="font-size:12px;font-weight:600;color:var(--t)">' + (mil.posto||'') + '</div>' +
+           '<div style="font-size:11px;color:var(--t3)">' + (mil.nome||'') + '</div>';
+  }
+  // fallback: nome salvo
+  if (!nome) return '—';
+  var parts = nome.split(' — ');
+  if (parts.length >= 2) {
+    return '<div style="font-size:12px;font-weight:600;color:var(--t)">' + parts[0] + '</div>' +
+           '<div style="font-size:11px;color:var(--t3)">' + parts.slice(1).join(' — ') + '</div>';
+  }
+  return '<strong>' + nome + '</strong>';
+}
+
 function _badgeFund(s) {
   if (!s) return '—';
   var sl = s.toLowerCase();
@@ -111,8 +128,9 @@ function rDisp() {
     '          <select id="df-nome" onchange="_autoFillNf(this.value)" style="padding:9px 12px;border:1.5px solid var(--b);border-radius:var(--r);font-family:var(--fn);font-size:13px;background:var(--s);color:var(--t)">' +
     '            <option value="">— Selecione o militar —</option>' +
               (APP.mils || []).slice().sort(function(a,b){return (a.posto+a.nome).localeCompare(b.posto+b.nome);}).map(function(m){
-                var label = (m.posto||'') + ' — ' + (m.nome||'');
-                var val   = JSON.stringify({nome: (m.posto||'') + ' ' + (m.nome||'').split(' ')[0].toUpperCase(), nf: m.nf||''});
+                var label    = (m.posto||'') + ' — ' + (m.nome||'');
+                var nomeDisp = (m.posto||'') + ' — ' + (m.nome||'');
+                var val      = JSON.stringify({nome: nomeDisp, nf: m.nf||''});
                 return '<option value=\'' + val.replace(/'/g,"\\'") + '\'>' + label + '</option>';
               }).join('') +
     '          </select>' +
@@ -197,7 +215,7 @@ function _rListaDisp() {
     return '<tr>' +
       '<td>' + _mesLabel(d.mes) + '</td>' +
       '<td><span class="badge bsm" style="' + turnoStyle + '">' + (d.turno||'—') + '</span></td>' +
-      '<td><strong>' + (d.nome||'—') + '</strong></td>' +
+      '<td>' + _fmtNomeMil(d.nome, d.nf) + '</td>' +
       '<td style="font-family:var(--mo);font-size:11px;color:var(--t3)">' + (d.nf||'—') + '</td>' +
       '<td>' + _badgeFund(d.solicitacao) + '</td>' +
       '<td style="font-family:var(--mo);font-size:11px;color:var(--t3)">' + (d.edocs||'—') + '</td>' +
