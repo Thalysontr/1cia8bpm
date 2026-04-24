@@ -17,7 +17,8 @@ var _CACHE = {
   escs:       null,
   vrte:       null,
   users:      null,
-  assinantes: null
+  assinantes: null,
+  disps:      null
 };
 
 // ─── DB: interface assíncrona via Firestore ─────────────────────
@@ -345,3 +346,28 @@ var HORARIOS_OPCOES=[
 ];
 var POSTOS=['Cap QOCPM','1º Ten QOC','2º Ten QOC','Asp Of PM','SubTen QPMP-C','1º Sgt QPMP-C','2º Sgt QPMP-C','3º Sgt QPMP-C','Cb QPMP-C','Sd QPMP-C'];
 var VM={'6':80,'8':100,'12':120};
+
+  // ── DISPENSAS ─────────────────────────────────────────────────
+  getDisps: function(cb) {
+    if (_CACHE.disps) { cb(_CACHE.disps); return; }
+    FBDB.collection('dispensas').orderBy('data','desc').get().then(function(snap) {
+      var list = [];
+      snap.forEach(function(d) { list.push(d.data()); });
+      _CACHE.disps = list;
+      cb(list);
+    });
+  },
+
+  saveDisp: function(disp, cb) {
+    FBDB.collection('dispensas').doc(String(disp.id)).set(disp).then(function() {
+      _CACHE.disps = null;
+      if (cb) cb();
+    });
+  },
+
+  deleteDisp: function(id, cb) {
+    FBDB.collection('dispensas').doc(String(id)).delete().then(function() {
+      _CACHE.disps = null;
+      if (cb) cb();
+    });
+  }

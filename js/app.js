@@ -10,11 +10,12 @@ var APP = {
   escs:       [],
   vrte:       { saldo: 0, hist: [] },
   users:      [],
-  assinantes: []
+  assinantes: [],
+  disps:      []
 };
 
 // ─── Navegação ──────────────────────────────────────────────────
-var PNL = { painel:'pp', vrte:'pv', ops:'po', nova:'pn', escalas:'pe', mils:'pm', cfg:'pc' };
+var PNL = { painel:'pp', vrte:'pv', ops:'po', nova:'pn', escalas:'pe', mils:'pm', cfg:'pc', disp:'pdisp' };
 
 function nav(id, el) {
   document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('on'); });
@@ -32,6 +33,7 @@ function render(id) {
   if (id === 'escalas') rEscs();
   if (id === 'mils')    rMils();
   if (id === 'cfg')     rCfg();
+  if (id === 'disp')    rDisp();
 }
 
 // ─── Inicialização — carrega tudo do Firestore antes de renderizar
@@ -47,7 +49,7 @@ function initApp() {
   document.getElementById('dm').innerHTML = '<div style="color:var(--t3);font-size:12px;padding:20px">Carregando dados...</div>';
 
   // Carregar tudo em paralelo
-  var pendentes = 5;
+  var pendentes = 6;
   function check() {
     pendentes--;
     if (pendentes === 0) _appPronto();
@@ -58,6 +60,7 @@ function initApp() {
   DB.getEscs(function(list)       { APP.escs       = list; check(); });
   DB.getVrte(function(v)          { APP.vrte       = v;    check(); });
   DB.getAssinantes(function(list) { APP.assinantes = list; check(); });
+  DB.getDisps(function(list)      { APP.disps      = list; check(); });
 }
 
 function _appPronto() {
@@ -73,4 +76,5 @@ function reloadOps(cb)   { DB.clearCache('ops');   DB.getOps(function(l){ APP.op
 function reloadEscs(cb)  { DB.clearCache('escs');  DB.getEscs(function(l){ APP.escs=l; if(cb)cb(l); }); }
 function reloadVrte(cb)  { DB.clearCache('vrte');  DB.getVrte(function(v){ APP.vrte=v; if(cb)cb(v); }); }
 function reloadUsers(cb) { DB.clearCache('users'); DB.getUsers(function(l){ APP.users=l; if(cb)cb(l); }); }
+function reloadDisp(cb)  { DB.clearCache('disps'); DB.getDisps(function(l){ APP.disps=l; if(cb)cb(l); }); }
 function reloadAss(cb)   { DB.clearCache('assinantes'); DB.getAssinantes(function(l){ APP.assinantes=l; if(cb)cb(l); }); }

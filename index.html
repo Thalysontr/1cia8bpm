@@ -76,6 +76,10 @@
         <span class="nic">◎</span>
         <span class="ni-tooltip">Militares</span>
       </div>
+      <div class="ni" onclick="nav('disp',this)" title="Dispensas">
+        <span class="nic">✕</span>
+        <span class="ni-tooltip">Dispensas</span>
+      </div>
     </div>
     <div class="sb-bottom">
       <hr class="sb-divider"/>
@@ -305,7 +309,48 @@
         </div>
       </div>
 
-      <!-- CONFIG -->
+      <!-- DISPENSAS -->
+      <div id="pdisp" class="panel">
+        <div class="ph">
+          <div class="pt">Dispensas administrativas</div>
+          <div class="ps">Folgas, licenças e afastamentos</div>
+        </div>
+        <div id="disp-alertas" style="display:none"></div>
+        <div class="card">
+          <div class="ch"><span class="ct">Registrar dispensa</span></div>
+          <div class="fr">
+            <div class="fg" style="flex:2">
+              <label>Militar <span style="color:var(--rd);font-weight:600">*</span></label>
+              <select id="disp-mil"><option value="">— Selecione o militar —</option></select>
+            </div>
+            <div class="fg">
+              <label>Data <span style="color:var(--rd);font-weight:600">*</span></label>
+              <input type="date" id="disp-data"/>
+            </div>
+          </div>
+          <div class="fr">
+            <div class="fg" style="flex:1.5">
+              <label>Tipo de dispensa <span style="color:var(--rd);font-weight:600">*</span></label>
+              <select id="disp-tipo"><option value="">— Selecione —</option></select>
+            </div>
+            <div class="fg" style="flex:2">
+              <label>Observação</label>
+              <input type="text" id="disp-obs" placeholder="Ex: Portaria nº 012/2026, aprovada pelo Cap. Nagib"/>
+            </div>
+          </div>
+          <div class="alert aok" id="disp-ok">Dispensa registrada!</div>
+          <div class="ar2"><button class="btn bp" onclick="salvarDisp()">Registrar dispensa</button></div>
+        </div>
+        <div class="card">
+          <div class="ch" style="flex-wrap:wrap;gap:8px">
+            <span class="ct">Histórico de dispensas</span>
+            <input type="text" id="disp-busca" placeholder="Buscar por nome, RG ou tipo..."
+              style="font-size:12px;padding:5px 10px;border:1px solid var(--b);border-radius:var(--r);background:var(--s2);width:220px"
+              oninput="filtrarDisp()"/>
+          </div>
+          <div id="disp-lista"></div>
+        </div>
+      </div>
       <div id="pc" class="panel">
         <div class="ph"><div class="pt">Configurações</div><div class="ps">Usuários, assinantes e dados</div></div>
         <div class="card"><div class="ch"><span class="ct">Usuários do sistema</span></div>
@@ -378,6 +423,7 @@ var TMPL_B64="UEsDBBQAAAAIAIFdlVzJf3/HuAEAABMJAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbL
 <script src="js/escalas.js"></script>
 <script src="js/militares.js"></script>
 <script src="js/config.js"></script>
+<script src="js/dispensas.js"></script>
 
 </body>
 </html>
