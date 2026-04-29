@@ -118,19 +118,6 @@ async function rVRTE() {
   html += `</div></div></div>
 
     <div class="card">
-      <h3>Registrar movimento</h3>
-      <div class="form-row">
-        <select id="vrte-tipo">
-          <option value="entrada">Entrada</option>
-          <option value="saida">Saída manual</option>
-        </select>
-        <input type="number" id="vrte-qtd" placeholder="Quantidade" min="1">
-        <input type="text" id="vrte-ref" placeholder="Referência (ex: Repasse mensal)">
-        <button onclick="regVRTE()">Registrar</button>
-      </div>
-    </div>
-
-    <div class="card">
       <h3>Histórico completo</h3>
       <table class="tbl">
         <thead>
