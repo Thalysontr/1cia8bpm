@@ -1,199 +1,175 @@
 // js/vrte.js — Painel de VRTE
-// CORREÇÃO: escalas canceladas NÃO entram no cálculo de "Consumo por operação"
-//           nem no "Usado em [mês]"
+// Preenche apenas os elementos dinâmicos do index.html (não substitui innerHTML da página)
 
 async function rVRTE() {
-  const p = document.getElementById('pvrte');
-  if (!p) return;
-
   const v = APP.vrte || { saldo: 0, historico: [] };
   const hist = (v.historico || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
 
-  // ===== Métricas =====
-  const totalEntradas = hist.filter(h => h.tipo === 'entrada').reduce((s, h) => s + (h.qtd || 0), 0);
-  const totalSaidas = hist.filter(h => h.tipo === 'saida').reduce((s, h) => s + (h.qtd || 0), 0);
-
-  // Mês atual (Apr/26 → "abr.")
   const hoje = new Date();
   const mesAtualNum = hoje.getMonth();
   const anoAtual = hoje.getFullYear();
   const mesAnteriorDate = new Date(anoAtual, mesAtualNum - 1, 1);
+  const nomeMes = hoje.toLocaleDateString('pt-BR', { month: 'long' });
+
+  const totalEntradas = hist.filter(h => h.tipo === 'entrada').reduce((s, h) => s + (h.qtd || 0), 0);
+  const totalSaidas   = hist.filter(h => h.tipo === 'saida').reduce((s, h) => s + (h.qtd || 0), 0);
 
   const usadoMesAtual = hist
-    .filter(h => {
-      if (h.tipo !== 'saida') return false;
-      const d = new Date(h.data);
-      return d.getMonth() === mesAtualNum && d.getFullYear() === anoAtual;
-    })
+    .filter(h => h.tipo === 'saida' && new Date(h.data).getMonth() === mesAtualNum && new Date(h.data).getFullYear() === anoAtual)
     .reduce((s, h) => s + (h.qtd || 0), 0);
 
   const usadoMesAnt = hist
-    .filter(h => {
-      if (h.tipo !== 'saida') return false;
-      const d = new Date(h.data);
-      return d.getMonth() === mesAnteriorDate.getMonth() && d.getFullYear() === mesAnteriorDate.getFullYear();
-    })
+    .filter(h => h.tipo === 'saida' && new Date(h.data).getMonth() === mesAnteriorDate.getMonth() && new Date(h.data).getFullYear() === mesAnteriorDate.getFullYear())
     .reduce((s, h) => s + (h.qtd || 0), 0);
 
-  const nomeMes = hoje.toLocaleDateString('pt-BR', { month: 'long' });
-
-  // Esgota em ~N meses (média 6 meses)
   const seisMeses = [];
   for (let i = 0; i < 6; i++) {
     const d = new Date(anoAtual, mesAtualNum - i, 1);
     const total = hist
-      .filter(h => {
-        if (h.tipo !== 'saida') return false;
-        const dh = new Date(h.data);
-        return dh.getMonth() === d.getMonth() && dh.getFullYear() === d.getFullYear();
-      })
+      .filter(h => h.tipo === 'saida' && new Date(h.data).getMonth() === d.getMonth() && new Date(h.data).getFullYear() === d.getFullYear())
       .reduce((s, h) => s + (h.qtd || 0), 0);
     seisMeses.push(total);
   }
   const mediaConsumo = seisMeses.reduce((a, b) => a + b, 0) / 6 || 1;
-  const esgotaEm = (v.saldo > 0) ? Math.round(v.saldo / mediaConsumo) : 0;
+  const esgotaEm = v.saldo > 0 ? Math.round(v.saldo / mediaConsumo) : 0;
 
-  // ===== Consumo por operação — IGNORA escalas canceladas =====
-  const escAtivas = (APP.escs || []).filter(e => !e.cancelada && e.status !== 'cancelada');
-  const consumoPorOp = {};
-  escAtivas.forEach(e => {
-    const op = e.operacao || 'SEM OPERAÇÃO';
-    consumoPorOp[op] = (consumoPorOp[op] || 0) + (e.vrteTotal || 0);
-  });
-  const totalConsumoOps = Object.values(consumoPorOp).reduce((a, b) => a + b, 0) || 1;
-
-  // ===== HTML =====
-  let html = `
-    <h1>Controle de VRTE</h1>
-    <p class="muted">Entradas, débitos e análise de consumo</p>
-
-    <div class="grid-4">
-      <div class="card metric">
-        <div class="m-label">SALDO ATUAL</div>
-        <div class="m-value ${v.saldo <= 0 ? 'red' : ''}">${v.saldo || 0}</div>
-        <div class="m-sub">Esgota em ~${esgotaEm} meses</div>
-      </div>
-      <div class="card metric">
-        <div class="m-label">USADO EM ${nomeMes.toUpperCase()}</div>
-        <div class="m-value">${usadoMesAtual}</div>
-        <div class="m-sub">Mês anterior: ${usadoMesAnt}</div>
-      </div>
-      <div class="card metric">
-        <div class="m-label">TOTAL ENTRADAS</div>
-        <div class="m-value">${totalEntradas}</div>
-        <div class="m-sub">desde o início</div>
-      </div>
-      <div class="card metric">
-        <div class="m-label">TOTAL SAÍDAS</div>
-        <div class="m-value">${totalSaidas}</div>
-        <div class="m-sub">em todas as escalas</div>
-      </div>
-    </div>
-
-    <div class="grid-2">
-      <div class="card">
-        <h3>Entradas vs saídas (6 meses)</h3>
-        <canvas id="vrte-chart" height="180"></canvas>
-      </div>
-      <div class="card">
-        <h3>Consumo por operação</h3>
-        <div class="ops-list">`;
-
-  if (Object.keys(consumoPorOp).length === 0) {
-    html += `<div class="muted">Nenhuma escala ativa.</div>`;
-  } else {
-    Object.entries(consumoPorOp)
-      .sort((a, b) => b[1] - a[1])
-      .forEach(([op, qtd]) => {
-        const pct = Math.round((qtd / totalConsumoOps) * 100);
-        html += `
-          <div class="op-row">
-            <span class="op-name">${esc(op)}</span>
-            <span class="op-val">${qtd} <span class="muted">(${pct}%)</span></span>
-            <div class="op-bar"><div class="op-bar-fill" style="width:${pct}%"></div></div>
-          </div>`;
-      });
+  // Cards de métricas
+  const vm = document.getElementById('vm');
+  if (vm) {
+    vm.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px">
+        <div class="card metric" style="margin-bottom:0">
+          <div class="m-label">SALDO ATUAL</div>
+          <div class="m-value${v.saldo <= 0 ? ' red' : ''}">${v.saldo || 0}</div>
+          <div class="m-sub">Esgota em ~${esgotaEm} ${esgotaEm === 1 ? 'mês' : 'meses'}</div>
+        </div>
+        <div class="card metric" style="margin-bottom:0">
+          <div class="m-label">USADO EM ${nomeMes.toUpperCase()}</div>
+          <div class="m-value">${usadoMesAtual}</div>
+          <div class="m-sub">Mês anterior: ${usadoMesAnt}</div>
+        </div>
+        <div class="card metric" style="margin-bottom:0">
+          <div class="m-label">TOTAL ENTRADAS</div>
+          <div class="m-value">${totalEntradas}</div>
+          <div class="m-sub">desde o início</div>
+        </div>
+        <div class="card metric" style="margin-bottom:0">
+          <div class="m-label">TOTAL SAÍDAS</div>
+          <div class="m-value">${totalSaidas}</div>
+          <div class="m-sub">em todas as escalas</div>
+        </div>
+      </div>`;
   }
 
-  html += `</div></div></div>
+  // Gráfico de barras
+  const vg = document.getElementById('v-grafico');
+  if (vg) {
+    const maxVal = Math.max(...seisMeses, 1);
+    let barHtml = '';
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(anoAtual, mesAtualNum - i, 1);
+      const label = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+      const ent = hist
+        .filter(h => h.tipo === 'entrada' && new Date(h.data).getMonth() === d.getMonth() && new Date(h.data).getFullYear() === d.getFullYear())
+        .reduce((s, h) => s + (h.qtd || 0), 0);
+      const sai = seisMeses[5 - i] || 0;
+      const hEnt = Math.round((ent / maxVal) * 80);
+      const hSai = Math.round((sai / maxVal) * 80);
+      barHtml += `
+        <div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:2px">
+          <div style="display:flex;align-items:flex-end;gap:2px;height:80px">
+            <div title="Entradas: ${ent}" style="width:10px;height:${Math.max(hEnt,1)}px;background:var(--gn2,#4caf50);border-radius:2px 2px 0 0"></div>
+            <div title="Saídas: ${sai}" style="width:10px;height:${Math.max(hSai,1)}px;background:var(--rd2,#d32f2f);border-radius:2px 2px 0 0"></div>
+          </div>
+          <span style="font-size:9px;color:var(--t2)">${label}</span>
+        </div>`;
+    }
+    vg.innerHTML = barHtml;
+  }
 
-    <div class="card">
-      <h3>Histórico completo</h3>
-      <table class="tbl">
-        <thead>
-          <tr><th>Data</th><th>Tipo</th><th>Qtd</th><th>Saldo após</th><th>Referência</th></tr>
-        </thead>
-        <tbody>`;
+  // Consumo por operação
+  const vop = document.getElementById('v-op');
+  if (vop) {
+    const escAtivas = (APP.escs || []).filter(e => !e.cancelada && e.status !== 'cancelada');
+    const consumoPorOp = {};
+    escAtivas.forEach(e => {
+      const op = e.operacao || 'SEM OPERAÇÃO';
+      consumoPorOp[op] = (consumoPorOp[op] || 0) + (e.vrteTotal || 0);
+    });
+    const totalConsumoOps = Object.values(consumoPorOp).reduce((a, b) => a + b, 0) || 1;
 
-  if (!hist.length) {
-    html += `<tr><td colspan="5" class="muted ctr">Nenhum movimento.</td></tr>`;
-  } else {
-    hist.forEach(h => {
-      const sinal = h.tipo === 'entrada' ? '+' : '-';
-      const badge = h.tipo === 'entrada'
-        ? '<span class="badge ok">Entrada</span>'
-        : '<span class="badge bad">Saída</span>';
-      html += `
-        <tr>
+    if (Object.keys(consumoPorOp).length === 0) {
+      vop.innerHTML = '<div class="muted" style="font-size:12px">Nenhuma escala ativa.</div>';
+    } else {
+      vop.innerHTML = Object.entries(consumoPorOp)
+        .sort((a, b) => b[1] - a[1])
+        .map(([op, qtd]) => {
+          const pct = Math.round((qtd / totalConsumoOps) * 100);
+          return `
+            <div style="margin-bottom:6px">
+              <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px">
+                <span>${esc(op)}</span>
+                <span style="color:var(--t2)">${qtd} (${pct}%)</span>
+              </div>
+              <div style="height:4px;background:var(--b3,#eee);border-radius:2px">
+                <div style="height:4px;width:${pct}%;background:var(--ac,#1a3a5c);border-radius:2px"></div>
+              </div>
+            </div>`;
+        }).join('');
+    }
+  }
+
+  // Resumo mensal
+  const vtm = document.getElementById('v-tmeses');
+  if (vtm) {
+    let rows = '';
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(anoAtual, mesAtualNum - i, 1);
+      const nomeMesRow = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      const ent = hist
+        .filter(h => h.tipo === 'entrada' && new Date(h.data).getMonth() === d.getMonth() && new Date(h.data).getFullYear() === d.getFullYear())
+        .reduce((s, h) => s + (h.qtd || 0), 0);
+      const sai = hist
+        .filter(h => h.tipo === 'saida' && new Date(h.data).getMonth() === d.getMonth() && new Date(h.data).getFullYear() === d.getFullYear())
+        .reduce((s, h) => s + (h.qtd || 0), 0);
+      const saldo = ent - sai;
+      rows += `<tr>
+        <td>${nomeMesRow}</td>
+        <td style="color:var(--gn,green)">+${ent}</td>
+        <td style="color:var(--rd,red)">${sai > 0 ? '-' : ''}${sai}</td>
+        <td>${saldo >= 0 ? '+' : ''}${saldo}</td>
+      </tr>`;
+    }
+    vtm.innerHTML = rows || '<tr><td colspan="4" class="muted ctr">Sem dados.</td></tr>';
+  }
+
+  // Histórico completo
+  const vtb = document.getElementById('vtb');
+  if (vtb) {
+    if (!hist.length) {
+      vtb.innerHTML = '<tr><td colspan="5" class="muted ctr">Nenhum movimento.</td></tr>';
+    } else {
+      vtb.innerHTML = hist.map(h => {
+        const sinal = h.tipo === 'entrada' ? '+' : '-';
+        const badge = h.tipo === 'entrada'
+          ? '<span class="badge ok">Entrada</span>'
+          : '<span class="badge bad">Saída</span>';
+        return `<tr>
           <td>${fd(h.data)}</td>
           <td>${badge}</td>
           <td>${sinal}${h.qtd}</td>
           <td>${h.saldoApos}</td>
           <td>${esc(h.ref || '—')}</td>
         </tr>`;
-    });
-  }
-
-  html += `</tbody></table></div>`;
-  p.innerHTML = html;
-
-  // Renderiza chart
-  setTimeout(() => renderVRTEChart(hist), 50);
-}
-
-function renderVRTEChart(hist) {
-  const cv = document.getElementById('vrte-chart');
-  if (!cv || typeof Chart === 'undefined') return;
-
-  const hoje = new Date();
-  const labels = [];
-  const entradas = [];
-  const saidas = [];
-
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
-    labels.push(d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }));
-
-    const ent = hist
-      .filter(h => h.tipo === 'entrada' && new Date(h.data).getMonth() === d.getMonth() && new Date(h.data).getFullYear() === d.getFullYear())
-      .reduce((s, h) => s + (h.qtd || 0), 0);
-    const sai = hist
-      .filter(h => h.tipo === 'saida' && new Date(h.data).getMonth() === d.getMonth() && new Date(h.data).getFullYear() === d.getFullYear())
-      .reduce((s, h) => s + (h.qtd || 0), 0);
-
-    entradas.push(ent);
-    saidas.push(sai);
-  }
-
-  // Destrói chart anterior se existir
-  if (window._vrteChart) window._vrteChart.destroy();
-
-  window._vrteChart = new Chart(cv, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        { label: 'Entradas', data: entradas, backgroundColor: 'rgba(76,175,80,.3)', borderColor: '#4caf50', borderWidth: 1 },
-        { label: 'Saídas', data: saidas, backgroundColor: 'rgba(244,67,54,.25)', borderColor: '#d32f2f', borderWidth: 1 }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { position: 'top' } },
-      scales: { y: { beginAtZero: true } }
+      }).join('');
     }
-  });
+  }
+
+  // Preenche data padrão se vazio
+  const vd = document.getElementById('vd');
+  if (vd && !vd.value) {
+    vd.value = hoje.toISOString().split('T')[0];
+  }
 }
 
 async function regVRTE() {
@@ -203,16 +179,15 @@ async function regVRTE() {
   const obsEl   = document.getElementById('vo');
   const alertEl = document.getElementById('va');
 
-  const data  = dataEl  ? dataEl.value  : '';
-  const qtd   = qtdEl   ? parseInt(qtdEl.value) : 0;
-  const tipo  = tipoEl  ? tipoEl.value.trim()   : '';
-  const obs   = obsEl   ? obsEl.value.trim()     : '';
+  const data = dataEl ? dataEl.value : '';
+  const qtd  = qtdEl  ? parseInt(qtdEl.value) : 0;
+  const tipo = tipoEl ? tipoEl.value.trim()   : '';
+  const obs  = obsEl  ? obsEl.value.trim()    : '';
 
-  if (!data)           { alert('Informe a data.'); return; }
-  if (!qtd || qtd <= 0){ alert('Quantidade inválida.'); return; }
-  if (!tipo)           { alert('Selecione o tipo de operação.'); return; }
+  if (!data)            { alert('Informe a data.'); return; }
+  if (!qtd || qtd <= 0) { alert('Quantidade inválida.'); return; }
+  if (!tipo)            { alert('Selecione o tipo de operação.'); return; }
 
-  // Monta referência: "Colheita — Lote referência abril/2026" ou só "Colheita"
   const ref = obs ? `${tipo} — ${obs}` : tipo;
 
   const v = APP.vrte || { saldo: 0, historico: [] };
@@ -234,12 +209,10 @@ async function regVRTE() {
     ]
   });
 
-  // Limpa campos
   if (qtdEl)  qtdEl.value  = '';
-  if (tipoEl) tipoEl.value = '';
+  if (tipoEl) tipoEl.selectedIndex = 0;
   if (obsEl)  obsEl.value  = '';
 
-  // Mostra alerta de sucesso
   if (alertEl) {
     alertEl.style.display = 'block';
     setTimeout(() => { alertEl.style.display = 'none'; }, 3000);
