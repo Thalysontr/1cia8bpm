@@ -118,15 +118,25 @@ async function rVRTE() {
   html += `</div></div></div>
 
     <div class="card">
-      <h3>Registrar movimento</h3>
+      <h3>Registrar entrada de VRTE</h3>
       <div class="form-row">
-        <select id="vrte-tipo">
-          <option value="entrada">Entrada</option>
-          <option value="saida">Saída manual</option>
-        </select>
-        <input type="number" id="vrte-qtd" placeholder="Quantidade" min="1">
-        <input type="text" id="vrte-ref" placeholder="Referência (ex: Repasse mensal)">
-        <button onclick="regVRTE()">Registrar</button>
+        <div style="display:flex;flex-direction:column;gap:4px;flex:1">
+          <label style="font-size:.8rem;font-weight:600">Data</label>
+          <input type="date" id="vrte-data" value="${new Date().toISOString().split('T')[0]}">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex:1">
+          <label style="font-size:.8rem;font-weight:600">Quantidade</label>
+          <input type="number" id="vrte-quantidade" placeholder="Ex: 500" min="1">
+        </div>
+      </div>
+      <div class="form-row" style="margin-top:8px">
+        <div style="display:flex;flex-direction:column;gap:4px;flex:1">
+          <label style="font-size:.8rem;font-weight:600">Observação</label>
+          <input type="text" id="vrte-obs" placeholder="Ex: Lote referência abril/2026">
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:12px">
+        <button onclick="regVRTE()">Registrar entrada</button>
       </div>
     </div>
 
@@ -210,30 +220,44 @@ function renderVRTEChart(hist) {
 }
 
 async function regVRTE() {
-  const tipo = document.getElementById('vrte-tipo').value;
-  const qtd = parseInt(document.getElementById('vrte-qtd').value);
-  const ref = document.getElementById('vrte-ref').value.trim();
+  const dataEl = document.getElementById('vrte-data');
+  const qtdEl  = document.getElementById('vrte-quantidade');
+  const obsEl  = document.getElementById('vrte-obs');
 
+  if (!dataEl || !qtdEl || !obsEl) {
+    alert('Erro interno: campos do formulário não encontrados.');
+    return;
+  }
+
+  const data = dataEl.value;
+  const qtd  = parseInt(qtdEl.value);
+  const obs  = obsEl.value.trim();
+
+  if (!data) { alert('Informe a data.'); return; }
   if (!qtd || qtd <= 0) { alert('Quantidade inválida.'); return; }
-  if (!ref) { alert('Informe a referência.'); return; }
+  if (!obs) { alert('Informe a observação/referência.'); return; }
 
   const v = APP.vrte || { saldo: 0, historico: [] };
-  const novoSaldo = tipo === 'entrada' ? (v.saldo || 0) + qtd : (v.saldo || 0) - qtd;
+  const novoSaldo = (v.saldo || 0) + qtd;
 
   await DB.saveVRTE({
     saldo: novoSaldo,
     historico: [
       ...(v.historico || []),
       {
-        data: new Date().toISOString().split('T')[0],
-        tipo,
+        data,
+        tipo: 'entrada',
         qtd,
         saldoApos: novoSaldo,
-        ref,
+        ref: obs,
         ts: Date.now()
       }
     ]
   });
+
+  // Limpa os campos
+  qtdEl.value = '';
+  obsEl.value = '';
 
   await reloadVRTE();
   rVRTE();
