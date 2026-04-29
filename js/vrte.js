@@ -193,20 +193,23 @@ async function regVRTE() {
   const v = APP.vrte || { saldo: 0, historico: [] };
   const novoSaldo = (v.saldo || 0) + qtd;
 
-  await DB.saveVRTE({
-    saldo: novoSaldo,
-    historico: [
-      ...(v.historico || []),
-      {
-        data,
-        tipo: 'entrada',
-        tipoOp: tipo,
-        qtd,
-        saldoApos: novoSaldo,
-        ref,
-        ts: Date.now()
-      }
-    ]
+  // CORRIGIDO: era DB.saveVRTE (maiúsculo), agora DB.saveVrte (correto)
+  await new Promise((resolve, reject) => {
+    DB.saveVrte({
+      saldo: novoSaldo,
+      historico: [
+        ...(v.historico || []),
+        {
+          data,
+          tipo: 'entrada',
+          tipoOp: tipo,
+          qtd,
+          saldoApos: novoSaldo,
+          ref,
+          ts: Date.now()
+        }
+      ]
+    }, resolve);
   });
 
   if (qtdEl)  qtdEl.value  = '';
