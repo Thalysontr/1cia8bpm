@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// escala.js — Módulo Nova Escala v4
+// escala.js — Módulo Nova Escala v5
 // 1ª CIA / 8º BPM · Sistema ISEO
 //
 // Modelo baseado fielmente nos PDFs:
@@ -23,32 +23,34 @@ var _LOCAIS_PADRAO = [
   'São Pedro, Santo Antônio, São Miguel, São Marcos e Adjacências'
 ];
 
-// Texto fixo da missão (igual nos dois PDFs)
 var _MISSAO_PADRAO = 'Fazer saturação nos bairros com planejamento específico de ações repressivas, locais sensíveis com alto índice de violência, tráfico, dentre outros delitos';
 
-// Determinações padrão
+// Determinações padrão — cada uma tem flag "soColheita" para condicional
 var _DETERMINACOES_PADRAO = [
   {
     id: 'det_bus',
     titulo: 'DETERMINAÇÃO 01',
     texto: 'Gerar no mínimo 03 BUs: Z14I6D - OCORRÊNCIAS DIVERSAS/ASSISTENCIAIS: OPERAÇÕES POLICIAIS: AÇÕES PREVENTIVAS: VISITA TRANQUILIZADORA: EM ÁREA RURAL. – 01 BU para cada visita tranquilizadora.',
-    incluir: false
+    incluir: false,
+    soColheita: true
   },
   {
     id: 'det_form',
     titulo: 'DETERMINAÇÃO 02',
     texto: 'Preencher os dados da ESCALA ISEO COLHEITA, no link: https://forms.gle/U1K5utgwhuN2K75JA.',
-    incluir: false
+    incluir: false,
+    soColheita: true
   },
   {
     id: 'det_sigeo',
     titulo: 'DETERMINAÇÃO SIGEO',
     texto: 'Confeccionar Relatório preenchendo os dados da Operação no SIGEO, imediatamente, após a realização da escala, utilizando no campo específico o Nome da Operação. Os nomes de todos os militares escalados na ISEO, deverão ser relacionados no relatório, no item "3.2 – Observações e Sugestões"; Gerar PDF do relatório e encaminhar via E-Docs para: 1ª CIA/8º BPM. O RELATÓRIO SIGEO DEVERÁ OBRIGATORIAMENTE SER PREENCHIDO E ENCAMINHADO IMPRETERIVELMENTE ATÉ ÀS 10:00 HORAS DO 1º DIA ÚTIL SUBSEQUENTE A ESCALA.',
-    incluir: true
+    incluir: true,
+    soColheita: false
   }
 ];
 
-// ROTAS PADRÃO (incluídas sempre no anexo)
+// ROTAS PADRÃO
 var _ROTAS_PADRAO = {
   ladoSul: [
     'ROTA 1: Barbados, Maria Ortiz, Lagoa do Limão, Taboal, Córrego Olho D\'água e Baunilha.',
@@ -65,7 +67,6 @@ var _ROTAS_PADRAO = {
   ]
 };
 
-// Anexo 01 - Lista de visitas tranquilizadoras (Marilândia)
 var _ANEXO_VISITAS = [
   ['Rafael Caldonho', '27995195461', 'Rua Cônego João Guilherme Marilândia'],
   ['Saulo Zerboni', '27998247644', 'Córrego da Raiz - Vizinho Luiz Carlos Comério'],
@@ -95,9 +96,23 @@ var _ANEXO_VISITAS = [
   ['Assis Tozzi Milanez', '27992915788', 'Córrego São José (vizinho do Brazilino Altoé)']
 ];
 
-// ─── Estado da tela ──────────────────────────────────────────────
-var _turnos = []; // [{ horarioPreset, horarioCustom, localPreset, localCustom, missao, mils:[] }]
+// ─── Estado ──────────────────────────────────────────────────────
+var _turnos = [];
 var _determinacoes = JSON.parse(JSON.stringify(_DETERMINACOES_PADRAO));
+
+// ═══════════════════════════════════════════════════════════════
+// HELPERS — verifica se operação é "Colheita"
+// ═══════════════════════════════════════════════════════════════
+function _isOperacaoColheita() {
+  var sel = document.getElementById('eo');
+  if (!sel) return false;
+  var val = sel.value;
+  if (val === '__outra__') {
+    var outro = document.getElementById('eo-outro');
+    val = outro ? outro.value : '';
+  }
+  return /colheita/i.test(val || '');
+}
 
 // ═══════════════════════════════════════════════════════════════
 // RENDER PRINCIPAL
@@ -105,12 +120,6 @@ var _determinacoes = JSON.parse(JSON.stringify(_DETERMINACOES_PADRAO));
 function rNova() {
   var ed = document.getElementById('ed');
   if (ed && !ed.value) ed.value = new Date().toISOString().split('T')[0];
-
-  // Atualiza select de duração com nosso novo formato (mantém compatibilidade)
-  var edu = document.getElementById('edu');
-  if (edu && edu.options.length <= 4) {
-    // ok, mantém o que está no HTML
-  }
 
   updSelOp();
   updSelAss();
@@ -140,7 +149,6 @@ function initTurnos() {
 }
 
 function addTurno() {
-  // Herda configurações do último turno mas com militares vazios
   var last = _turnos[_turnos.length - 1] || {};
   _turnos.push({
     horarioPreset: last.horarioPreset || '17:00-01:00',
@@ -168,27 +176,12 @@ function renderTurnos() {
   var tc = document.getElementById('tc');
   if (!tc) return;
 
-  var mils = (APP.mils || []).slice().sort(function(a, b) {
-    return ((a.posto || '') + ' ' + (a.nome || '')).localeCompare((b.posto || '') + ' ' + (b.nome || ''));
-  });
-
-  var milOptions = '<option value="">— Selecione um militar —</option>' +
-    mils.map(function(m) {
-      var rg = m.rg || m.nf || '';
-      return '<option value="' + rg + '">' +
-        (m.posto || '') + ' ' + (m.nome || '') +
-        (rg ? ' · RG ' + rg : '') +
-        '</option>';
-    }).join('');
-
   tc.innerHTML = _turnos.map(function(t, idx) {
-    // Select de horários
     var horOpts = _HORARIOS_PADRAO.map(function(h) {
       return '<option value="' + h.v + '"' + (h.v === t.horarioPreset ? ' selected' : '') + '>' + h.l + '</option>';
     }).join('') +
     '<option value="__outro__"' + (t.horarioPreset === '__outro__' ? ' selected' : '') + '>Outra...</option>';
 
-    // Select de locais
     var locOpts = _LOCAIS_PADRAO.map(function(l) {
       return '<option value="' + esc(l) + '"' + (l === t.localPreset ? ' selected' : '') + '>' + esc(l) + '</option>';
     }).join('') +
@@ -222,12 +215,15 @@ function renderTurnos() {
       '    <textarea rows="2" oninput="atualizarTurno(' + idx + ',\'missao\',this.value)" style="font-size:12px">' + esc(t.missao || '') + '</textarea>',
       '  </div>',
 
-      '  <div style="margin-top:10px">',
-      '    <label style="font-size:11px;color:var(--t2);font-weight:600">Adicionar militar a este turno</label>',
-      '    <div style="display:flex;gap:6px;margin-top:4px">',
-      '      <select id="mil-sel-' + idx + '" style="flex:1">' + milOptions + '</select>',
-      '      <button class="btn bp bsm" onclick="addMilTurno(' + idx + ')">+ Adicionar</button>',
-      '    </div>',
+      // ⭐ Busca pesquisável de militar
+      '  <div style="margin-top:10px;background:var(--s);padding:10px;border-radius:var(--r);border:1px solid var(--b)">',
+      '    <label style="font-size:11px;color:var(--t2);font-weight:600;display:block;margin-bottom:4px">🔍 Buscar e adicionar militar</label>',
+      '    <input type="text" id="mil-busca-' + idx + '" autocomplete="off"',
+      '      placeholder="Digite nome, RG, NF ou posto..."',
+      '      oninput="_filtrarMilitares(' + idx + ',this.value)"',
+      '      onfocus="_filtrarMilitares(' + idx + ',this.value)"',
+      '      style="font-size:12px;padding:6px 10px;width:100%"/>',
+      '    <div id="mil-resultados-' + idx + '" style="display:none;max-height:240px;overflow-y:auto;border:1px solid var(--b);border-radius:var(--r);background:var(--s);margin-top:4px;position:relative;z-index:10"></div>',
       '  </div>',
 
       '  <div style="margin-top:10px" id="mils-turno-' + idx + '">' + renderMilsTurno(t, idx) + '</div>',
@@ -236,14 +232,89 @@ function renderTurnos() {
   }).join('');
 }
 
+// ═══════════════════════════════════════════════════════════════
+// BUSCA PESQUISÁVEL DE MILITAR (integrado com APP.mils)
+// ═══════════════════════════════════════════════════════════════
+function _filtrarMilitares(turnoIdx, query) {
+  var div = document.getElementById('mil-resultados-' + turnoIdx);
+  if (!div) return;
+
+  query = (query || '').toLowerCase().trim();
+
+  var todos = (APP.mils || []).slice();
+  var jaNoTurno = (_turnos[turnoIdx].mils || []).map(function(m) { return String(m.rg || ''); });
+
+  // Filtra: remove os que já estão no turno e aplica busca
+  var filtrados = todos.filter(function(m) {
+    if (jaNoTurno.indexOf(String(m.rg || '')) !== -1) return false;
+    if (!query) return true;
+    var alvo = ((m.posto || '') + ' ' + (m.nome || '') + ' ' + (m.rg || '') + ' ' + (m.nf || '')).toLowerCase();
+    return alvo.indexOf(query) !== -1;
+  });
+
+  // Ordena
+  filtrados.sort(function(a, b) {
+    return ((a.posto || '') + ' ' + (a.nome || '')).localeCompare((b.posto || '') + ' ' + (b.nome || ''));
+  });
+
+  if (!filtrados.length) {
+    div.style.display = 'block';
+    div.innerHTML = '<div style="padding:10px;font-size:11px;color:var(--t3);text-align:center">Nenhum militar encontrado para "' + esc(query) + '".</div>';
+    return;
+  }
+
+  div.style.display = 'block';
+  div.innerHTML = filtrados.slice(0, 50).map(function(m) {
+    var rg = m.rg || m.nf || '';
+    var rgSafe = String(rg).replace(/'/g, "\\'");
+    return '<div onclick="_addMilDaBusca(' + turnoIdx + ',\'' + rgSafe + '\')" ' +
+           'style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--b);display:flex;justify-content:space-between;align-items:center" ' +
+           'onmouseover="this.style.background=\'var(--s2)\'" onmouseout="this.style.background=\'\'">' +
+           '<span><strong>' + esc(m.posto || '') + '</strong> ' + esc(m.nome || '') + '</span>' +
+           '<span style="font-family:var(--mo);font-size:10px;color:var(--t3)">RG ' + (m.rg || '—') + (m.nf ? ' · NF ' + m.nf : '') + '</span>' +
+           '</div>';
+  }).join('') +
+  (filtrados.length > 50 ? '<div style="padding:6px;font-size:10px;color:var(--t3);text-align:center;font-style:italic">+ ' + (filtrados.length - 50) + ' resultados — refine a busca</div>' : '');
+}
+
+function _addMilDaBusca(turnoIdx, rg) {
+  var mil = (APP.mils || []).find(function(m) { return String(m.rg || m.nf || '') === String(rg); });
+  if (!mil) return;
+
+  // Define função padrão automática
+  var funcaoPadrao = 'Patrulheiro';
+  if (_turnos[turnoIdx].mils.length === 0) funcaoPadrao = 'Cmt da Operação';
+  else if (_turnos[turnoIdx].mils.length === 1) funcaoPadrao = 'Motorista';
+
+  _turnos[turnoIdx].mils.push({
+    rg: rg,
+    nf: mil.nf || '',
+    nome: mil.nome || '',
+    posto: mil.posto || '',
+    funcao: mil.funcao || funcaoPadrao
+  });
+
+  // Limpa busca e atualiza
+  var busca = document.getElementById('mil-busca-' + turnoIdx);
+  if (busca) busca.value = '';
+  var div = document.getElementById('mil-resultados-' + turnoIdx);
+  if (div) { div.style.display = 'none'; div.innerHTML = ''; }
+
+  var milsDiv = document.getElementById('mils-turno-' + turnoIdx);
+  if (milsDiv) milsDiv.innerHTML = renderMilsTurno(_turnos[turnoIdx], turnoIdx);
+
+  updVN();
+}
+
 function renderMilsTurno(t, idx) {
   if (!t.mils || !t.mils.length) {
-    return '<div style="font-size:11px;color:var(--t3);text-align:center;padding:10px;background:var(--s);border-radius:var(--r)">Nenhum militar adicionado neste turno.</div>';
+    return '<div style="font-size:11px;color:var(--t3);text-align:center;padding:10px;background:var(--s);border-radius:var(--r);border:1px dashed var(--b)">Nenhum militar adicionado neste turno. Use a busca acima.</div>';
   }
 
   var rows = t.mils.map(function(m, mIdx) {
     return [
       '<tr>',
+      '<td style="font-size:11px;text-align:center">' + (mIdx + 1) + '.</td>',
       '<td style="font-size:11px">' + esc(m.posto || '—') + '</td>',
       '<td style="font-size:11px"><strong>' + esc(m.nome || '—') + '</strong></td>',
       '<td style="font-family:var(--mo);font-size:10px;color:var(--t3)">' + (m.rg || '—') + '</td>',
@@ -265,6 +336,7 @@ function renderMilsTurno(t, idx) {
   return [
     '<div style="overflow-x:auto"><table style="width:100%;font-size:11px">',
     '<thead><tr>',
+    '<th style="text-align:center;width:30px">#</th>',
     '<th style="text-align:left">Posto/Grad.</th>',
     '<th style="text-align:left">Nome Completo</th>',
     '<th style="text-align:left">RG</th>',
@@ -287,42 +359,6 @@ function atualizarFuncaoMil(turnoIdx, milIdx, valor) {
   _turnos[turnoIdx].mils[milIdx].funcao = valor;
 }
 
-function addMilTurno(turnoIdx) {
-  var sel = document.getElementById('mil-sel-' + turnoIdx);
-  if (!sel || !sel.value) {
-    alert('Selecione um militar.');
-    return;
-  }
-  var rg = sel.value;
-  var mil = (APP.mils || []).find(function(m) { return (m.rg || m.nf || '').toString() === rg; });
-  if (!mil) return;
-
-  if (_turnos[turnoIdx].mils.some(function(m) { return m.rg === rg; })) {
-    alert('Militar já está neste turno.');
-    return;
-  }
-
-  // Define função padrão: 1º do turno = Cmt da Operação, 2º = Motorista, demais = Patrulheiro
-  var funcaoPadrao = 'Patrulheiro';
-  if (_turnos[turnoIdx].mils.length === 0) funcaoPadrao = 'Cmt da Operação';
-  else if (_turnos[turnoIdx].mils.length === 1) funcaoPadrao = 'Motorista';
-
-  _turnos[turnoIdx].mils.push({
-    rg: rg,
-    nf: mil.nf || '',
-    nome: mil.nome || '',
-    posto: mil.posto || '',
-    funcao: mil.funcao || funcaoPadrao
-  });
-
-  sel.value = '';
-
-  var div = document.getElementById('mils-turno-' + turnoIdx);
-  if (div) div.innerHTML = renderMilsTurno(_turnos[turnoIdx], turnoIdx);
-
-  updVN();
-}
-
 function removerMilTurno(turnoIdx, milIdx) {
   if (!_turnos[turnoIdx]) return;
   _turnos[turnoIdx].mils.splice(milIdx, 1);
@@ -332,10 +368,9 @@ function removerMilTurno(turnoIdx, milIdx) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// DETERMINAÇÕES (checkboxes editáveis)
+// DETERMINAÇÕES — checkbox visual + condicional por operação
 // ═══════════════════════════════════════════════════════════════
 function renderDeterminacoes() {
-  // Cria a seção dinamicamente se não existir
   var pn = document.getElementById('pn');
   if (!pn) return;
 
@@ -345,7 +380,6 @@ function renderDeterminacoes() {
     return;
   }
 
-  // Insere antes do card de assinatura (procura pelo "ass-sel")
   var cards = pn.querySelectorAll('.card');
   var assCard = null;
   for (var i = 0; i < cards.length; i++) {
@@ -361,50 +395,68 @@ function renderDeterminacoes() {
     '  <div style="font-size:11px;color:var(--t3);margin-bottom:10px">Marque as determinações que devem aparecer no PDF/DOCX final. O texto pode ser editado.</div>' +
     '  <div id="det-list"></div>' +
     '  <hr class="div" style="margin:14px 0 10px"/>' +
-    '  <label style="display:flex;align-items:center;gap:6px;cursor:pointer">' +
-    '    <input type="checkbox" id="incl-ordem" onchange="updVN()"/>' +
-    '    <span style="font-size:12px">Incluir <strong>ORDEM DE OPERAÇÃO Nº</strong> no cabeçalho</span>' +
+    '  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;border:1.5px solid var(--b);border-radius:var(--r);background:var(--s2)">' +
+    '    <input type="checkbox" id="incl-ordem" onchange="_toggleOrdemNum(this)" style="width:18px;height:18px;cursor:pointer;flex-shrink:0"/>' +
+    '    <span style="font-size:13px">Incluir <strong>ORDEM DE OPERAÇÃO Nº</strong> no cabeçalho</span>' +
     '  </label>' +
     '  <div id="ordem-num-wrap" style="display:none;margin-top:6px">' +
     '    <input type="text" id="ordem-num" placeholder="Ex: 008/2026" style="font-size:12px;padding:5px 10px"/>' +
     '  </div>' +
     '  <hr class="div" style="margin:14px 0 10px"/>' +
-    '  <label style="display:flex;align-items:center;gap:6px;cursor:pointer">' +
-    '    <input type="checkbox" id="incl-rotas" checked/>' +
-    '    <span style="font-size:12px">Incluir <strong>Anexo de Rotas e Visitas Tranquilizadoras</strong> (página separada do PDF)</span>' +
+    '  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;border:1.5px solid var(--b);border-radius:var(--r);background:var(--s2)">' +
+    '    <input type="checkbox" id="incl-rotas" checked style="width:18px;height:18px;cursor:pointer;flex-shrink:0"/>' +
+    '    <span style="font-size:13px">Incluir <strong>Anexo de Rotas e Visitas Tranquilizadoras</strong> (página separada do PDF)</span>' +
     '  </label>' +
     '</div>';
 
   if (assCard) assCard.insertAdjacentHTML('beforebegin', html);
   else pn.querySelector('.ar2').insertAdjacentHTML('beforebegin', html);
 
-  // Bind do checkbox de ordem
-  document.getElementById('incl-ordem').addEventListener('change', function() {
-    document.getElementById('ordem-num-wrap').style.display = this.checked ? '' : 'none';
-  });
-
   _renderDeterminacoesContent();
+}
+
+function _toggleOrdemNum(chk) {
+  var wrap = document.getElementById('ordem-num-wrap');
+  if (wrap) wrap.style.display = chk.checked ? '' : 'none';
 }
 
 function _renderDeterminacoesContent() {
   var list = document.getElementById('det-list');
   if (!list) return;
 
-  list.innerHTML = _determinacoes.map(function(d, i) {
+  var isColheita = _isOperacaoColheita();
+
+  // Filtra: mostra todas que NÃO são "soColheita", e as "soColheita" só se for Colheita
+  var visiveis = _determinacoes.filter(function(d) {
+    return !d.soColheita || isColheita;
+  });
+
+  if (!visiveis.length) {
+    list.innerHTML = '<div style="font-size:11px;color:var(--t3);text-align:center;padding:10px;background:var(--s2);border-radius:var(--r)">Nenhuma determinação aplicável a esta operação.</div>';
+    return;
+  }
+
+  list.innerHTML = visiveis.map(function(d) {
+    // Encontra o índice real no array original
+    var realIdx = _determinacoes.findIndex(function(x) { return x.id === d.id; });
+    var bgChecked = d.incluir ? 'background:var(--p2,rgba(59,130,246,.08));border-color:var(--p,#3b82f6)' : 'background:var(--s2);border-color:var(--b)';
+
     return [
-      '<div style="border:1px solid var(--b);border-radius:var(--r);padding:10px;margin-bottom:8px;background:var(--s2)">',
-      '  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:6px">',
-      '    <input type="checkbox" ' + (d.incluir ? 'checked' : '') + ' onchange="_determinacoes[' + i + '].incluir=this.checked"/>',
-      '    <strong style="font-size:12px">' + d.titulo + '</strong>',
+      '<div style="border:1.5px solid;border-radius:var(--r);padding:12px 14px;margin-bottom:10px;' + bgChecked + ';transition:all .15s">',
+      '  <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:8px">',
+      '    <input type="checkbox" ' + (d.incluir ? 'checked' : '') + ' onchange="_determinacoes[' + realIdx + '].incluir=this.checked;_renderDeterminacoesContent()" ',
+      '      style="width:20px;height:20px;cursor:pointer;flex-shrink:0;accent-color:var(--p,#3b82f6)"/>',
+      '    <strong style="font-size:14px;flex:1">' + d.titulo + '</strong>',
+      d.soColheita ? '    <span style="font-size:10px;color:var(--p);background:rgba(59,130,246,.1);padding:2px 6px;border-radius:10px;font-weight:600">só Colheita</span>' : '',
       '  </label>',
-      '  <textarea rows="3" oninput="_determinacoes[' + i + '].texto=this.value" style="font-size:11px;font-family:var(--mo)">' + esc(d.texto) + '</textarea>',
+      '  <textarea rows="3" oninput="_determinacoes[' + realIdx + '].texto=this.value" style="font-size:11px;font-family:var(--mo);width:100%">' + esc(d.texto) + '</textarea>',
       '</div>'
     ].join('');
   }).join('');
 }
 
 // ═══════════════════════════════════════════════════════════════
-// SELECT DE OPERAÇÕES
+// SELECT DE OPERAÇÕES (com auto-detecção de Colheita)
 // ═══════════════════════════════════════════════════════════════
 function updSelOp() {
   var sel = document.getElementById('eo');
@@ -431,15 +483,34 @@ function toggleOpOutra() {
   if (sel.value === '__outra__') {
     input.style.display = '';
     input.focus();
+    input.oninput = function() {
+      _aplicarColheitaAuto();
+      _renderDeterminacoesContent();
+    };
   } else {
     input.style.display = 'none';
     input.value = '';
   }
+  _aplicarColheitaAuto();
+  _renderDeterminacoesContent();
+}
+
+// Auto-marca det. 01 e 02 quando seleciona Colheita
+function _aplicarColheitaAuto() {
+  var isColheita = _isOperacaoColheita();
+  _determinacoes.forEach(function(d) {
+    if (d.soColheita) d.incluir = isColheita;
+  });
 }
 
 function preencherMunOp() {
   var sel = document.getElementById('eo');
-  if (!sel || !sel.value || sel.value === '__outra__') return;
+  if (!sel || !sel.value || sel.value === '__outra__') {
+    _aplicarColheitaAuto();
+    _renderDeterminacoesContent();
+    return;
+  }
+
   var op = (APP.ops || []).find(function(o) { return o.nome === sel.value; });
   if (op && op.municipio) {
     var mun = document.getElementById('em');
@@ -459,16 +530,19 @@ function preencherMunOp() {
     }
   }
 
-  // Auto-preenche ordem de operação se cadastrada
   if (op && op.ordem) {
     var ordChk = document.getElementById('incl-ordem');
     var ordIn = document.getElementById('ordem-num');
     if (ordChk && ordIn) {
       ordChk.checked = true;
-      document.getElementById('ordem-num-wrap').style.display = '';
+      var w = document.getElementById('ordem-num-wrap');
+      if (w) w.style.display = '';
       ordIn.value = op.ordem.replace(/^ORDEM DE OPERAÇÃO Nº\s*/i, '').trim();
     }
   }
+
+  _aplicarColheitaAuto();
+  _renderDeterminacoesContent();
 }
 
 function toggleMunOutra(selId, inputId) {
@@ -490,7 +564,6 @@ function toggleMunOutra(selId, inputId) {
 function updSelAss() {
   var sel = document.getElementById('ass-sel');
   if (!sel) return;
-
   var ass = APP.assinantes || [];
   sel.innerHTML = '<option value="">— selecione —</option>' +
     ass.map(function(a, i) {
@@ -510,7 +583,7 @@ function selecionarAss() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CÁLCULO DE VRTE
+// VRTE NOTICE
 // ═══════════════════════════════════════════════════════════════
 function updVN() {
   var vn = document.getElementById('vnotice');
@@ -553,7 +626,7 @@ function updVN() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// HELPERS
+// HELPERS DE LABEL
 // ═══════════════════════════════════════════════════════════════
 function _horarioLabel(t) {
   if (t.horarioPreset === '__outro__') return t.horarioCustom || '—';
@@ -567,7 +640,7 @@ function _localLabel(t) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// COLETA DOS DADOS
+// COLETA DE DADOS
 // ═══════════════════════════════════════════════════════════════
 function getEscData() {
   function v(id) { return (document.getElementById(id) || {}).value || ''; }
@@ -586,8 +659,14 @@ function getEscData() {
 
   var inclOrdem = (document.getElementById('incl-ordem') || {}).checked;
   var ordemNum = inclOrdem ? v('ordem-num').trim() : '';
-
   var inclRotas = (document.getElementById('incl-rotas') || {}).checked;
+
+  var isColheita = /colheita/i.test(op);
+  var detsAtivas = _determinacoes.filter(function(d) {
+    if (!d.incluir) return false;
+    if (d.soColheita && !isColheita) return false;
+    return true;
+  });
 
   return {
     operacao: op,
@@ -596,7 +675,7 @@ function getEscData() {
     municipio: mun,
     duracao: dur,
     turnos: JSON.parse(JSON.stringify(_turnos)),
-    determinacoes: _determinacoes.filter(function(d) { return d.incluir; }),
+    determinacoes: detsAtivas,
     inclRotas: inclRotas,
     assinante: {
       nome: v('ean'),
@@ -636,7 +715,7 @@ function prevEsc() {
 
   var diaSemana = new Date(d.data + 'T12:00:00').toLocaleDateString('pt-BR', { weekday:'long' }).toUpperCase();
 
-  var turnosHtml = d.turnos.map(function(t, i) {
+  var turnosHtml = d.turnos.map(function(t) {
     var milsHtml = (t.mils || []).map(function(m, mi) {
       return '<tr>' +
         '<td style="border:1px solid #888;padding:4px;text-align:center">' + (mi+1) + '.</td>' +
@@ -739,19 +818,32 @@ function limparEsc() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// SALVAR
+// SALVAR — CORRIGIDO (com proteção e logs)
 // ═══════════════════════════════════════════════════════════════
 function salvarEsc() {
+  console.log('[salvarEsc] iniciando...');
   var d = getEscData();
+  console.log('[salvarEsc] dados coletados:', d);
+
   var erro = validarEsc(d);
-  if (erro) { alertaErro(erro); return; }
+  if (erro) {
+    console.warn('[salvarEsc] validação falhou:', erro);
+    alertaErro(erro);
+    return;
+  }
+
+  // Verifica se DB existe
+  if (typeof DB === 'undefined' || typeof DB.saveEscala !== 'function') {
+    console.error('[salvarEsc] DB.saveEscala não disponível');
+    alertaErro('Erro: DB.saveEscala não está disponível. Recarregue a página.');
+    return;
+  }
 
   var saldo = ((APP.vrte || {}).saldo) || 0;
   if (d.tipo === 'vermelha' && d.vrteTotal > saldo) {
     if (!confirm('⚠️ VRTE necessário (' + d.vrteTotal + ') é maior que o saldo atual (' + saldo + ').\n\nContinuar mesmo assim?')) return;
   }
 
-  // Achata militares dos turnos
   var todosMils = [];
   d.turnos.forEach(function(t, ti) {
     (t.mils || []).forEach(function(m) {
@@ -785,30 +877,43 @@ function salvarEsc() {
     criadaEm:  new Date().toISOString()
   };
 
-  DB.saveEscala(escala, function() {
-    if (d.tipo === 'vermelha' && d.vrteTotal > 0) {
-      var v = APP.vrte || { saldo: 0, hist: [] };
-      var novoSaldo = (v.saldo || 0) - d.vrteTotal;
-      var hist = (v.hist || v.historico || []).slice();
-      hist.push({
-        data: d.data,
-        tipo: 'saida',
-        qtd: d.vrteTotal,
-        saldoApos: novoSaldo,
-        ref: 'Escala — ' + d.operacao,
-        ts: Date.now()
-      });
-      DB.saveVrte({ saldo: novoSaldo, hist: hist, historico: hist }, function() {
+  console.log('[salvarEsc] chamando DB.saveEscala com:', escala);
+
+  try {
+    DB.saveEscala(escala, function(resultado) {
+      console.log('[salvarEsc] DB.saveEscala retornou:', resultado);
+
+      if (d.tipo === 'vermelha' && d.vrteTotal > 0 && typeof DB.saveVrte === 'function') {
+        var v = APP.vrte || { saldo: 0, hist: [] };
+        var novoSaldo = (v.saldo || 0) - d.vrteTotal;
+        var hist = (v.hist || v.historico || []).slice();
+        hist.push({
+          data: d.data,
+          tipo: 'saida',
+          qtd: d.vrteTotal,
+          saldoApos: novoSaldo,
+          ref: 'Escala — ' + d.operacao,
+          ts: Date.now()
+        });
+        DB.saveVrte({ saldo: novoSaldo, hist: hist, historico: hist }, function() {
+          finalizarSalvar();
+        });
+      } else {
         finalizarSalvar();
-      });
-    } else {
-      finalizarSalvar();
-    }
-  });
+      }
+    });
+  } catch (err) {
+    console.error('[salvarEsc] erro:', err);
+    alertaErro('Erro ao salvar: ' + err.message);
+  }
 
   function finalizarSalvar() {
-    reloadEscs(function() {
-      reloadVrte(function() {
+    console.log('[salvarEsc] finalizando...');
+    var fnEscs = (typeof reloadEscs === 'function') ? reloadEscs : function(cb){ if(cb)cb(); };
+    var fnVrte = (typeof reloadVrte === 'function') ? reloadVrte : function(cb){ if(cb)cb(); };
+
+    fnEscs(function() {
+      fnVrte(function() {
         alertaOk('Escala salva com sucesso!');
         _turnos = [];
         _determinacoes = JSON.parse(JSON.stringify(_DETERMINACOES_PADRAO));
@@ -828,7 +933,7 @@ function salvarEsc() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// GERAR PDF — fiel ao modelo
+// GERAR PDF
 // ═══════════════════════════════════════════════════════════════
 function gerarPDF() {
   var d = getEscData();
@@ -857,7 +962,7 @@ function gerarPDF() {
       return y;
     }
 
-    function footer(y) {
+    function footer() {
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(8);
       doc.text('"Polícia Militar, patrimônio do povo capixaba."', W/2, 285, { align:'center' });
@@ -868,7 +973,6 @@ function gerarPDF() {
     var y = 15;
     y = header(y);
 
-    // Título da operação
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
     doc.setFillColor(126, 211, 247);
@@ -886,21 +990,17 @@ function gerarPDF() {
       y += 3;
     }
 
-    // Data
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.text('DATA: ' + fd(d.data).toUpperCase() + ' (' + diaSem + ')', M, y);
     y += 6;
 
-    // Município principal
     doc.setFillColor(126, 211, 247);
     doc.rect(M, y-2, W-2*M, 6, 'F');
     doc.text('MUNICÍPIO DE ' + d.municipio.toUpperCase(), W/2, y+2, { align:'center' });
     y += 8;
 
-    // Tabela de cada turno
     d.turnos.forEach(function(t) {
-      // Local destacado
       doc.setFontSize(9);
       doc.setFillColor(255, 245, 157);
       doc.rect(M, y-2, W-2*M, 5, 'F');
@@ -908,26 +1008,22 @@ function gerarPDF() {
       doc.text(_localLabel(t), W/2, y+1.5, { align:'center' });
       y += 5;
 
-      // Missão
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
-      doc.rect(M, y-2, W-2*M, 0); // só pra calc
       var lines = doc.splitTextToSize(t.missao || _MISSAO_PADRAO, W - 2*M - 4);
       var hh = lines.length * 4 + 1;
       doc.rect(M, y-2, W-2*M, hh);
       doc.text(lines, W/2, y+2, { align:'center' });
       y += hh - 1;
 
-      // Horário
       doc.setFillColor(255, 245, 157);
       doc.rect(M, y-2, W-2*M, 5, 'F');
       doc.setFont('helvetica', 'bold');
       doc.text('Horário da escala: ' + _horarioLabel(t), W/2, y+1.5, { align:'center' });
       y += 5;
 
-      // Cabeçalho da tabela de militares
       doc.setFillColor(230, 230, 230);
-      var cols = [12, 28, 65, 23, 23, 31]; // larguras: ordem, posto, nome, RG, NF, função
+      var cols = [12, 28, 65, 23, 23, 31];
       var x = M;
       var headers = ['Ordem', 'Posto/Grad.', 'Nome Completo', 'RG', 'NF', 'Função'];
       doc.rect(M, y-2, W-2*M, 5, 'F');
@@ -938,7 +1034,6 @@ function gerarPDF() {
       });
       y += 5;
 
-      // Linhas
       doc.setFont('helvetica', 'normal');
       (t.mils || []).forEach(function(m, mi) {
         x = M;
@@ -956,7 +1051,6 @@ function gerarPDF() {
           doc.text(ll, x + cols[i]/2, y+1.5, { align:'center' });
           x += cols[i];
         });
-        // verticais
         x = M;
         cols.forEach(function(cw) {
           x += cw;
@@ -966,16 +1060,15 @@ function gerarPDF() {
       });
       y += 3;
 
-      if (y > 250) { footer(y); doc.addPage(); y = 15; y = header(y); }
+      if (y > 250) { footer(); doc.addPage(); y = 15; y = header(y); }
     });
 
-    // Determinações
     if (d.determinacoes.length) {
       y += 3;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       d.determinacoes.forEach(function(det) {
-        if (y > 270) { footer(y); doc.addPage(); y = 15; y = header(y); }
+        if (y > 270) { footer(); doc.addPage(); y = 15; y = header(y); }
         doc.setFillColor(255, 245, 157);
         var titW = doc.getTextWidth(det.titulo + ':');
         doc.rect(M, y-3, titW+2, 5, 'F');
@@ -991,8 +1084,7 @@ function gerarPDF() {
       });
     }
 
-    // Local + assinatura
-    if (y > 250) { footer(y); doc.addPage(); y = 15; y = header(y); }
+    if (y > 250) { footer(); doc.addPage(); y = 15; y = header(y); }
     y += 8;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
@@ -1009,9 +1101,8 @@ function gerarPDF() {
       doc.text(lin2, W/2, y, { align:'center' });
     }
 
-    footer(y);
+    footer();
 
-    // ANEXO DE ROTAS (página separada)
     if (d.inclRotas) {
       doc.addPage();
       var ay = 15;
@@ -1028,7 +1119,6 @@ function gerarPDF() {
       doc.text('Realização de Patrulhamento e Visitas Tranquilizadoras.', W/2, ay, { align:'center' });
       ay += 6;
 
-      // Lado Sul
       doc.setFont('helvetica', 'bold');
       doc.setFillColor(255, 245, 157);
       doc.rect(M, ay-3, 30, 5, 'F');
@@ -1057,12 +1147,11 @@ function gerarPDF() {
         var lines = doc.splitTextToSize(r, W - 2*M - 4);
         doc.text(lines, M+2, ay);
         ay += lines.length * 4 + 1;
-        if (ay > 270) { footer(ay); doc.addPage(); ay = 15; ay = header(ay); }
+        if (ay > 270) { footer(); doc.addPage(); ay = 15; ay = header(ay); }
       });
 
-      // Anexo 01 - tabela
       ay += 3;
-      if (ay > 240) { footer(ay); doc.addPage(); ay = 15; ay = header(ay); }
+      if (ay > 240) { footer(); doc.addPage(); ay = 15; ay = header(ay); }
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
       doc.setFillColor(126, 211, 247);
@@ -1070,7 +1159,7 @@ function gerarPDF() {
       doc.text('ANEXO 01: SUGESTÃO DE VISITAS TRANQUILIZADORAS – MARILÂNDIA', W/2, ay+1, { align:'center' });
       ay += 7;
 
-      var ac = [50, 35, 97]; // larguras: nome, contato, endereço
+      var ac = [50, 35, 97];
       doc.setFontSize(9);
       doc.setFillColor(255, 245, 157);
       doc.rect(M, ay-3, W-2*M, 5, 'F');
@@ -1084,7 +1173,7 @@ function gerarPDF() {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       _ANEXO_VISITAS.forEach(function(v) {
-        if (ay > 275) { footer(ay); doc.addPage(); ay = 15; ay = header(ay); }
+        if (ay > 275) { footer(); doc.addPage(); ay = 15; ay = header(ay); }
         var nl = doc.splitTextToSize(v[0], ac[0]-2);
         var cl = doc.splitTextToSize(v[1], ac[1]-2);
         var el = doc.splitTextToSize(v[2], ac[2]-2);
@@ -1098,7 +1187,7 @@ function gerarPDF() {
       });
 
       ay += 8;
-      if (ay > 250) { footer(ay); doc.addPage(); ay = 15; ay = header(ay); }
+      if (ay > 250) { footer(); doc.addPage(); ay = 15; ay = header(ay); }
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
       doc.text('Colatina-ES, ' + dataAssin + '.', W/2, ay, { align:'center' });
@@ -1111,7 +1200,7 @@ function gerarPDF() {
         var lin2b = (d.assinante.rg || '') + (d.assinante.cargo ? ' - ' + d.assinante.cargo : '');
         doc.text(lin2b, W/2, ay, { align:'center' });
       }
-      footer(ay);
+      footer();
     }
 
     var nomeArq = 'Escala_ISEO_Dia_' + d.data.split('-').reverse().join('-') + '_-_1ª_Cia-8º_BPM_-_' + (d.operacao || 'op').replace(/[^\w]/g, '_') + '.pdf';
@@ -1124,7 +1213,7 @@ function gerarPDF() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// GERAR DOCX (versão simplificada — para edição manual depois)
+// GERAR DOCX
 // ═══════════════════════════════════════════════════════════════
 function gerarDocx() {
   var d = getEscData();
@@ -1140,12 +1229,11 @@ function gerarDocx() {
     var Document = docx.Document, Packer = docx.Packer, Paragraph = docx.Paragraph,
         TextRun = docx.TextRun, AlignmentType = docx.AlignmentType,
         Table = docx.Table, TableRow = docx.TableRow, TableCell = docx.TableCell,
-        WidthType = docx.WidthType, ShadingType = docx.ShadingType;
+        WidthType = docx.WidthType;
 
     var children = [];
     var diaSem = new Date(d.data + 'T12:00:00').toLocaleDateString('pt-BR', { weekday:'long' }).toUpperCase();
 
-    // Cabeçalho
     children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'GOVERNO DO ESTADO DO ESPÍRITO SANTO', bold:true, size:22 })] }));
     children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'POLÍCIA MILITAR', bold:true, size:22 })] }));
     children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'OITAVO BATALHÃO', bold:true, size:22 })] }));
@@ -1163,7 +1251,6 @@ function gerarDocx() {
     children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'MUNICÍPIO DE ' + d.municipio.toUpperCase(), bold:true, size:22 })] }));
     children.push(new Paragraph({ text:'' }));
 
-    // Turnos
     d.turnos.forEach(function(t) {
       children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: _localLabel(t), bold:true, size:22 })] }));
       children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: t.missao || _MISSAO_PADRAO, italics:true })] }));
@@ -1190,7 +1277,6 @@ function gerarDocx() {
       children.push(new Paragraph({ text:'' }));
     });
 
-    // Determinações
     d.determinacoes.forEach(function(det) {
       children.push(new Paragraph({ children: [new TextRun({ text: det.titulo + ':', bold:true, underline:{} })] }));
       children.push(new Paragraph({ children: [new TextRun('• ' + det.texto)] }));
@@ -1208,7 +1294,6 @@ function gerarDocx() {
       children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(lin2)] }));
     }
 
-    // Anexo de Rotas
     if (d.inclRotas) {
       children.push(new Paragraph({ pageBreakBefore: true, alignment: AlignmentType.CENTER, children: [new TextRun({ text:'ÁREA DE ATUAÇÃO: 1ª CIA/8º BPM – Colatina/Marilândia – ES', bold:true })] }));
       children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun('Realização de Patrulhamento e Visitas Tranquilizadoras.')] }));
