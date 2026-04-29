@@ -1,226 +1,297 @@
-// js/vrte.js — Painel de VRTE
-// Preenche apenas os elementos dinâmicos do index.html (não substitui innerHTML da página)
+// js/vrte.js — Painel de VRTE (redesenhado)
+// Cards visuais aprimorados, gráfico inline, lançamento por operação
 
+// ── Operações disponíveis para lançamento ──────────────────────
+var VRTE_OPS = [
+  { id: 'colheita',   label: 'Colheita',        cor: '#1a3a5c' },
+  { id: 'forca',      label: 'Força e Presença', cor: '#2e7d32' },
+  { id: 'forcatotal', label: 'Força Total',      cor: '#6a1f6e' },
+  { id: 'verao',      label: 'Verão',            cor: '#b45309' },
+  { id: 'outro',      label: 'Outra operação',   cor: '#555'    },
+];
+
+// ── Render principal do painel VRTE ───────────────────────────
 async function rVRTE() {
-  const v = APP.vrte || { saldo: 0, historico: [] };
-  const hist = (v.historico || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  var v    = APP.vrte || { saldo: 0, historico: [] };
+  var hist = (v.historico || []).slice().sort(function(a, b) { return (b.ts || 0) - (a.ts || 0); });
 
-  const hoje = new Date();
-  const mesAtualNum = hoje.getMonth();
-  const anoAtual = hoje.getFullYear();
-  const mesAnteriorDate = new Date(anoAtual, mesAtualNum - 1, 1);
-  const nomeMes = hoje.toLocaleDateString('pt-BR', { month: 'long' });
+  var hoje        = new Date();
+  var mesAtualNum = hoje.getMonth();
+  var anoAtual    = hoje.getFullYear();
+  var mesAntDate  = new Date(anoAtual, mesAtualNum - 1, 1);
+  var nomeMes     = hoje.toLocaleDateString('pt-BR', { month: 'long' });
 
-  const totalEntradas = hist.filter(h => h.tipo === 'entrada').reduce((s, h) => s + (h.qtd || 0), 0);
-  const totalSaidas   = hist.filter(h => h.tipo === 'saida').reduce((s, h) => s + (h.qtd || 0), 0);
+  var totalEnt = hist.filter(function(h){ return h.tipo === 'entrada'; }).reduce(function(s,h){ return s+(h.qtd||0); }, 0);
+  var totalSai = hist.filter(function(h){ return h.tipo === 'saida'; }).reduce(function(s,h){ return s+(h.qtd||0); }, 0);
 
-  const usadoMesAtual = hist
-    .filter(h => h.tipo === 'saida' && new Date(h.data).getMonth() === mesAtualNum && new Date(h.data).getFullYear() === anoAtual)
-    .reduce((s, h) => s + (h.qtd || 0), 0);
+  var usadoMes = hist.filter(function(h){
+    var d = new Date(h.data);
+    return h.tipo === 'saida' && d.getMonth() === mesAtualNum && d.getFullYear() === anoAtual;
+  }).reduce(function(s,h){ return s+(h.qtd||0); }, 0);
 
-  const usadoMesAnt = hist
-    .filter(h => h.tipo === 'saida' && new Date(h.data).getMonth() === mesAnteriorDate.getMonth() && new Date(h.data).getFullYear() === mesAnteriorDate.getFullYear())
-    .reduce((s, h) => s + (h.qtd || 0), 0);
+  var usadoAnt = hist.filter(function(h){
+    var d = new Date(h.data);
+    return h.tipo === 'saida' && d.getMonth() === mesAntDate.getMonth() && d.getFullYear() === mesAntDate.getFullYear();
+  }).reduce(function(s,h){ return s+(h.qtd||0); }, 0);
 
-  const seisMeses = [];
-  for (let i = 0; i < 6; i++) {
-    const d = new Date(anoAtual, mesAtualNum - i, 1);
-    const total = hist
-      .filter(h => h.tipo === 'saida' && new Date(h.data).getMonth() === d.getMonth() && new Date(h.data).getFullYear() === d.getFullYear())
-      .reduce((s, h) => s + (h.qtd || 0), 0);
-    seisMeses.push(total);
+  // Últimos 6 meses
+  var seisMeses = [];
+  for (var i = 0; i < 6; i++) {
+    var d = new Date(anoAtual, mesAtualNum - i, 1);
+    var mEnt = hist.filter(function(h){
+      var hd = new Date(h.data);
+      return h.tipo === 'entrada' && hd.getMonth() === d.getMonth() && hd.getFullYear() === d.getFullYear();
+    }).reduce(function(s,h){ return s+(h.qtd||0); }, 0);
+    var mSai = hist.filter(function(h){
+      var hd = new Date(h.data);
+      return h.tipo === 'saida' && hd.getMonth() === d.getMonth() && hd.getFullYear() === d.getFullYear();
+    }).reduce(function(s,h){ return s+(h.qtd||0); }, 0);
+    seisMeses.push({ d: d, ent: mEnt, sai: mSai });
   }
-  const mediaConsumo = seisMeses.reduce((a, b) => a + b, 0) / 6 || 1;
-  const esgotaEm = v.saldo > 0 ? Math.round(v.saldo / mediaConsumo) : 0;
 
-  // Cards de métricas
-  const vm = document.getElementById('vm');
+  var mediaSai = seisMeses.reduce(function(a,b){ return a+b.sai; }, 0) / 6 || 1;
+  var esgotaEm = v.saldo > 0 ? Math.round(v.saldo / mediaSai) : 0;
+  var pctUso   = totalEnt > 0 ? Math.round((totalSai / totalEnt) * 100) : 0;
+
+  // ── CARDS DE MÉTRICAS ──────────────────────────────────────
+  var vm = document.getElementById('vm');
   if (vm) {
-    vm.innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px">
-        <div class="card metric" style="margin-bottom:0">
-          <div class="m-label">SALDO ATUAL</div>
-          <div class="m-value${v.saldo <= 0 ? ' red' : ''}">${v.saldo || 0}</div>
-          <div class="m-sub">Esgota em ~${esgotaEm} ${esgotaEm === 1 ? 'mês' : 'meses'}</div>
-        </div>
-        <div class="card metric" style="margin-bottom:0">
-          <div class="m-label">USADO EM ${nomeMes.toUpperCase()}</div>
-          <div class="m-value">${usadoMesAtual}</div>
-          <div class="m-sub">Mês anterior: ${usadoMesAnt}</div>
-        </div>
-        <div class="card metric" style="margin-bottom:0">
-          <div class="m-label">TOTAL ENTRADAS</div>
-          <div class="m-value">${totalEntradas}</div>
-          <div class="m-sub">desde o início</div>
-        </div>
-        <div class="card metric" style="margin-bottom:0">
-          <div class="m-label">TOTAL SAÍDAS</div>
-          <div class="m-value">${totalSaidas}</div>
-          <div class="m-sub">em todas as escalas</div>
-        </div>
-      </div>`;
+    var corSaldo = v.saldo <= 0 ? '#c62828' : v.saldo < 200 ? '#e65100' : '#1a3a5c';
+    var varMes = '';
+    if (usadoMes > usadoAnt && usadoAnt > 0)
+      varMes = ' <span style="color:#c62828;font-size:10px">▲ ' + Math.round(((usadoMes - usadoAnt)/usadoAnt)*100) + '%</span>';
+    else if (usadoMes < usadoAnt && usadoMes > 0)
+      varMes = ' <span style="color:#2e7d32;font-size:10px">▼ ' + Math.round(((usadoAnt - usadoMes)/usadoAnt)*100) + '%</span>';
+
+    vm.innerHTML =
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px">' +
+
+      // Card saldo
+      '<div style="background:#fff;border-radius:12px;padding:18px 20px;box-shadow:0 2px 8px rgba(0,0,0,.07);border-top:4px solid ' + corSaldo + '">' +
+        '<div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--t2);margin-bottom:6px">SALDO ATUAL</div>' +
+        '<div style="font-size:38px;font-weight:800;color:' + corSaldo + ';line-height:1">' + (v.saldo || 0) + '</div>' +
+        '<div style="font-size:11px;color:var(--t2);margin-top:6px">' +
+          (v.saldo <= 0 ? '⚠ Saldo esgotado!' : 'Esgota em ~<strong>' + esgotaEm + '</strong> ' + (esgotaEm === 1 ? 'mês' : 'meses')) +
+        '</div>' +
+        '<div style="margin-top:10px;height:5px;background:#eee;border-radius:3px">' +
+          '<div style="height:5px;width:' + Math.min(pctUso,100) + '%;background:' + corSaldo + ';border-radius:3px"></div>' +
+        '</div>' +
+        '<div style="font-size:10px;color:var(--t2);margin-top:3px">' + pctUso + '% consumido do total creditado</div>' +
+      '</div>' +
+
+      // Card uso no mês
+      '<div style="background:#fff;border-radius:12px;padding:18px 20px;box-shadow:0 2px 8px rgba(0,0,0,.07);border-top:4px solid #1565c0">' +
+        '<div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--t2);margin-bottom:6px">USADO EM ' + nomeMes.toUpperCase() + '</div>' +
+        '<div style="font-size:38px;font-weight:800;color:#1565c0;line-height:1">' + usadoMes + '</div>' +
+        '<div style="font-size:11px;color:var(--t2);margin-top:6px">Mês anterior: <strong>' + usadoAnt + '</strong>' + varMes + '</div>' +
+        '<div style="font-size:10px;color:var(--t2);margin-top:10px">Média mensal: <strong>' + Math.round(mediaSai) + '</strong> VRTE</div>' +
+      '</div>' +
+
+      // Card entradas
+      '<div style="background:#fff;border-radius:12px;padding:18px 20px;box-shadow:0 2px 8px rgba(0,0,0,.07);border-top:4px solid #2e7d32">' +
+        '<div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--t2);margin-bottom:6px">TOTAL ENTRADAS</div>' +
+        '<div style="font-size:38px;font-weight:800;color:#2e7d32;line-height:1">+' + totalEnt + '</div>' +
+        '<div style="font-size:11px;color:var(--t2);margin-top:6px">desde o início do controle</div>' +
+        '<div style="font-size:10px;color:var(--t2);margin-top:10px">' + hist.filter(function(h){return h.tipo==='entrada';}).length + ' crédito(s) lançado(s)</div>' +
+      '</div>' +
+
+      // Card saídas
+      '<div style="background:#fff;border-radius:12px;padding:18px 20px;box-shadow:0 2px 8px rgba(0,0,0,.07);border-top:4px solid #c62828">' +
+        '<div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--t2);margin-bottom:6px">TOTAL SAÍDAS</div>' +
+        '<div style="font-size:38px;font-weight:800;color:#c62828;line-height:1">-' + totalSai + '</div>' +
+        '<div style="font-size:11px;color:var(--t2);margin-top:6px">em todas as escalas</div>' +
+        '<div style="font-size:10px;color:var(--t2);margin-top:10px">' + hist.filter(function(h){return h.tipo==='saida';}).length + ' débito(s) registrado(s)</div>' +
+      '</div>' +
+
+      '</div>';
   }
 
-  // Gráfico de barras
-  const vg = document.getElementById('v-grafico');
+  // ── GRÁFICO DE BARRAS (6 meses) ────────────────────────────
+  var vg = document.getElementById('v-grafico');
   if (vg) {
-    const maxVal = Math.max(...seisMeses, 1);
-    let barHtml = '';
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(anoAtual, mesAtualNum - i, 1);
-      const label = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
-      const ent = hist
-        .filter(h => h.tipo === 'entrada' && new Date(h.data).getMonth() === d.getMonth() && new Date(h.data).getFullYear() === d.getFullYear())
-        .reduce((s, h) => s + (h.qtd || 0), 0);
-      const sai = seisMeses[5 - i] || 0;
-      const hEnt = Math.round((ent / maxVal) * 80);
-      const hSai = Math.round((sai / maxVal) * 80);
-      barHtml += `
-        <div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:2px">
-          <div style="display:flex;align-items:flex-end;gap:2px;height:80px">
-            <div title="Entradas: ${ent}" style="width:10px;height:${Math.max(hEnt,1)}px;background:var(--gn2,#4caf50);border-radius:2px 2px 0 0"></div>
-            <div title="Saídas: ${sai}" style="width:10px;height:${Math.max(hSai,1)}px;background:var(--rd2,#d32f2f);border-radius:2px 2px 0 0"></div>
-          </div>
-          <span style="font-size:9px;color:var(--t2)">${label}</span>
-        </div>`;
+    var maxVal = 1;
+    seisMeses.forEach(function(m){ if(m.ent > maxVal) maxVal = m.ent; if(m.sai > maxVal) maxVal = m.sai; });
+    var barHtml = '';
+    for (var i = 5; i >= 0; i--) {
+      var m      = seisMeses[i];
+      var label  = m.d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+      var hEnt   = Math.round((m.ent / maxVal) * 100);
+      var hSai   = Math.round((m.sai / maxVal) * 100);
+      var isCur  = (i === 0);
+      barHtml +=
+        '<div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:3px">' +
+          '<div style="font-size:9px;color:#2e7d32;font-weight:700;min-height:14px">' + (m.ent > 0 ? '+'+m.ent : '') + '</div>' +
+          '<div style="display:flex;align-items:flex-end;gap:3px;height:100px">' +
+            '<div title="Entradas: '+m.ent+'" style="width:14px;height:'+Math.max(hEnt,2)+'px;background:#2e7d32;border-radius:3px 3px 0 0;opacity:'+(isCur?1:.65)+'"></div>' +
+            '<div title="Saídas: '+m.sai+'" style="width:14px;height:'+Math.max(hSai,2)+'px;background:#c62828;border-radius:3px 3px 0 0;opacity:'+(isCur?1:.65)+'"></div>' +
+          '</div>' +
+          '<span style="font-size:10px;color:'+(isCur?'var(--ac,#1a3a5c)':'var(--t2)')+';font-weight:'+(isCur?700:400)+'">' + label + '</span>' +
+        '</div>';
     }
     vg.innerHTML = barHtml;
   }
 
-  // Consumo por operação
-  const vop = document.getElementById('v-op');
+  // ── CONSUMO POR OPERAÇÃO ───────────────────────────────────
+  var vop = document.getElementById('v-op');
   if (vop) {
-    const escAtivas = (APP.escs || []).filter(e => !e.cancelada && e.status !== 'cancelada');
-    const consumoPorOp = {};
-    escAtivas.forEach(e => {
-      const op = e.operacao || 'SEM OPERAÇÃO';
-      consumoPorOp[op] = (consumoPorOp[op] || 0) + (e.vrteTotal || 0);
+    var porOp = {};
+    hist.filter(function(h){ return h.tipo === 'saida'; }).forEach(function(h) {
+      var op = h.tipoOp || 'Não informado';
+      porOp[op] = (porOp[op] || 0) + (h.qtd || 0);
     });
-    const totalConsumoOps = Object.values(consumoPorOp).reduce((a, b) => a + b, 0) || 1;
+    var totalOp = Object.values(porOp).reduce(function(a,b){ return a+b; }, 0) || 1;
+    var cores   = ['#1a3a5c','#2e7d32','#6a1f6e','#b45309','#1565c0','#555'];
 
-    if (Object.keys(consumoPorOp).length === 0) {
-      vop.innerHTML = '<div class="muted" style="font-size:12px">Nenhuma escala ativa.</div>';
+    if (!Object.keys(porOp).length) {
+      vop.innerHTML = '<div style="font-size:12px;color:var(--t2);padding:8px 0">Nenhuma saída registrada ainda.</div>';
     } else {
-      vop.innerHTML = Object.entries(consumoPorOp)
-        .sort((a, b) => b[1] - a[1])
-        .map(([op, qtd]) => {
-          const pct = Math.round((qtd / totalConsumoOps) * 100);
-          return `
-            <div style="margin-bottom:6px">
-              <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px">
-                <span>${esc(op)}</span>
-                <span style="color:var(--t2)">${qtd} (${pct}%)</span>
-              </div>
-              <div style="height:4px;background:var(--b3,#eee);border-radius:2px">
-                <div style="height:4px;width:${pct}%;background:var(--ac,#1a3a5c);border-radius:2px"></div>
-              </div>
-            </div>`;
+      vop.innerHTML = Object.entries(porOp)
+        .sort(function(a,b){ return b[1]-a[1]; })
+        .map(function(entry, idx) {
+          var op = entry[0], qtd = entry[1];
+          var pct = Math.round((qtd / totalOp) * 100);
+          var cor = cores[idx % cores.length];
+          return '<div style="margin-bottom:10px">' +
+            '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">' +
+              '<span style="font-weight:600">' + esc(op) + '</span>' +
+              '<span style="color:var(--t2)">' + qtd + ' VRTE · ' + pct + '%</span>' +
+            '</div>' +
+            '<div style="height:6px;background:#eee;border-radius:3px">' +
+              '<div style="height:6px;width:'+pct+'%;background:'+cor+';border-radius:3px"></div>' +
+            '</div>' +
+          '</div>';
         }).join('');
     }
   }
 
-  // Resumo mensal
-  const vtm = document.getElementById('v-tmeses');
+  // ── RESUMO MENSAL ─────────────────────────────────────────
+  var vtm = document.getElementById('v-tmeses');
   if (vtm) {
-    let rows = '';
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(anoAtual, mesAtualNum - i, 1);
-      const nomeMesRow = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-      const ent = hist
-        .filter(h => h.tipo === 'entrada' && new Date(h.data).getMonth() === d.getMonth() && new Date(h.data).getFullYear() === d.getFullYear())
-        .reduce((s, h) => s + (h.qtd || 0), 0);
-      const sai = hist
-        .filter(h => h.tipo === 'saida' && new Date(h.data).getMonth() === d.getMonth() && new Date(h.data).getFullYear() === d.getFullYear())
-        .reduce((s, h) => s + (h.qtd || 0), 0);
-      const saldo = ent - sai;
-      rows += `<tr>
-        <td>${nomeMesRow}</td>
-        <td style="color:var(--gn,green)">+${ent}</td>
-        <td style="color:var(--rd,red)">${sai > 0 ? '-' : ''}${sai}</td>
-        <td>${saldo >= 0 ? '+' : ''}${saldo}</td>
-      </tr>`;
+    var rows = '';
+    for (var i = 5; i >= 0; i--) {
+      var m = seisMeses[i];
+      var nomeMesRow = m.d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      var saldo = m.ent - m.sai;
+      var isCur = (i === 0);
+      rows += '<tr style="' + (isCur ? 'font-weight:600;background:rgba(26,58,92,.04)' : '') + '">' +
+        '<td>' + nomeMesRow + (isCur ? ' <span style="font-size:10px;color:var(--ac);font-weight:700">(atual)</span>' : '') + '</td>' +
+        '<td style="color:#2e7d32">+' + m.ent + '</td>' +
+        '<td style="color:#c62828">' + (m.sai > 0 ? '-' : '') + m.sai + '</td>' +
+        '<td style="color:' + (saldo >= 0 ? '#2e7d32' : '#c62828') + '">' + (saldo >= 0 ? '+' : '') + saldo + '</td>' +
+      '</tr>';
     }
     vtm.innerHTML = rows || '<tr><td colspan="4" class="muted ctr">Sem dados.</td></tr>';
   }
 
-  // Histórico completo
-  const vtb = document.getElementById('vtb');
+  // ── HISTÓRICO COMPLETO ─────────────────────────────────────
+  var vtb = document.getElementById('vtb');
   if (vtb) {
     if (!hist.length) {
-      vtb.innerHTML = '<tr><td colspan="5" class="muted ctr">Nenhum movimento.</td></tr>';
+      vtb.innerHTML = '<tr><td colspan="6" class="muted ctr">Nenhum movimento registrado.</td></tr>';
     } else {
-      vtb.innerHTML = hist.map(h => {
-        const sinal = h.tipo === 'entrada' ? '+' : '-';
-        const badge = h.tipo === 'entrada'
-          ? '<span class="badge ok">Entrada</span>'
-          : '<span class="badge bad">Saída</span>';
-        return `<tr>
-          <td>${fd(h.data)}</td>
-          <td>${badge}</td>
-          <td>${sinal}${h.qtd}</td>
-          <td>${h.saldoApos}</td>
-          <td>${esc(h.ref || '—')}</td>
-        </tr>`;
+      vtb.innerHTML = hist.map(function(h) {
+        var sinal = h.tipo === 'entrada' ? '+' : '-';
+        var badge = h.tipo === 'entrada'
+          ? '<span class="badge ok" style="font-size:10px">Entrada</span>'
+          : '<span class="badge bad" style="font-size:10px">Saída</span>';
+        var cor = h.tipo === 'entrada' ? '#2e7d32' : '#c62828';
+        return '<tr>' +
+          '<td>' + fd(h.data) + '</td>' +
+          '<td>' + badge + '</td>' +
+          '<td style="font-weight:700;color:' + cor + '">' + sinal + h.qtd + '</td>' +
+          '<td>' + (h.saldoApos !== undefined ? h.saldoApos : '—') + '</td>' +
+          '<td style="font-size:11px">' + esc(h.tipoOp || '—') + '</td>' +
+          '<td style="font-size:11px;color:var(--t2)">' + esc(h.ref || '—') + '</td>' +
+        '</tr>';
       }).join('');
     }
   }
 
-  // Preenche data padrão se vazio
-  const vd = document.getElementById('vd');
-  if (vd && !vd.value) {
-    vd.value = hoje.toISOString().split('T')[0];
-  }
+  // Data padrão no form
+  var vd = document.getElementById('vd');
+  if (vd && !vd.value) vd.value = hoje.toISOString().split('T')[0];
+
+  // Renderiza botões de operação
+  _renderOpBtns();
 }
 
-async function regVRTE() {
-  const dataEl  = document.getElementById('vd');
-  const qtdEl   = document.getElementById('vq');
-  const tipoEl  = document.getElementById('vtipo');
-  const obsEl   = document.getElementById('vo');
-  const alertEl = document.getElementById('va');
+// ── Renderiza botões de seleção de operação ────────────────────
+function _renderOpBtns() {
+  var wrap = document.getElementById('v-op-btns');
+  if (!wrap) return;
+  var sel = wrap.dataset.sel || '';
+  wrap.innerHTML = VRTE_OPS.map(function(op) {
+    var ativo = sel === op.id;
+    return '<button onclick="_selecionarOpVRTE(\'' + op.id + '\')" style="' +
+      'padding:9px 16px;border-radius:8px;border:2px solid ' + (ativo ? op.cor : '#ddd') + ';' +
+      'background:' + (ativo ? op.cor : '#fff') + ';color:' + (ativo ? '#fff' : '#444') + ';' +
+      'font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;margin:3px' +
+    '">' + op.label + '</button>';
+  }).join('');
+}
 
-  const data = dataEl ? dataEl.value : '';
-  const qtd  = qtdEl  ? parseInt(qtdEl.value) : 0;
-  const tipo = tipoEl ? tipoEl.value.trim()   : '';
-  const obs  = obsEl  ? obsEl.value.trim()    : '';
+function _selecionarOpVRTE(id) {
+  var wrap = document.getElementById('v-op-btns');
+  if (wrap) wrap.dataset.sel = id;
+  _renderOpBtns();
+  var obsWrap = document.getElementById('v-obs-wrap');
+  if (obsWrap) obsWrap.style.display = id === 'outro' ? '' : 'none';
+}
+
+// ── Registrar entrada ─────────────────────────────────────────
+async function regVRTE() {
+  var dataEl  = document.getElementById('vd');
+  var qtdEl   = document.getElementById('vq');
+  var obsEl   = document.getElementById('vo');
+  var alertEl = document.getElementById('va');
+  var wrap    = document.getElementById('v-op-btns');
+
+  var data  = dataEl ? dataEl.value : '';
+  var qtd   = qtdEl  ? parseInt(qtdEl.value) : 0;
+  var obs   = obsEl  ? obsEl.value.trim() : '';
+  var opId  = wrap   ? (wrap.dataset.sel || '') : '';
+  var opObj = VRTE_OPS.find(function(o){ return o.id === opId; });
+  var tipo  = opObj  ? opObj.label : (obs || '');
 
   if (!data)            { alert('Informe a data.'); return; }
   if (!qtd || qtd <= 0) { alert('Quantidade inválida.'); return; }
-  if (!tipo)            { alert('Selecione o tipo de operação.'); return; }
+  if (!opId)            { alert('Selecione o tipo de operação.'); return; }
+  if (opId === 'outro' && !obs) { alert('Informe a observação para "Outra operação".'); return; }
 
-  const ref = obs ? `${tipo} — ${obs}` : tipo;
+  var ref = (opId === 'outro') ? obs : (obs ? tipo + ' — ' + obs : tipo);
 
-  const v = APP.vrte || { saldo: 0, historico: [] };
-  const novoSaldo = (v.saldo || 0) + qtd;
+  var v = APP.vrte || { saldo: 0, historico: [] };
+  var novoSaldo = (v.saldo || 0) + qtd;
 
-  // CORRIGIDO: era DB.saveVRTE (maiúsculo), agora DB.saveVrte (correto)
-  await new Promise((resolve, reject) => {
+  await new Promise(function(resolve) {
     DB.saveVrte({
       saldo: novoSaldo,
-      historico: [
-        ...(v.historico || []),
-        {
-          data,
-          tipo: 'entrada',
-          tipoOp: tipo,
-          qtd,
-          saldoApos: novoSaldo,
-          ref,
-          ts: Date.now()
-        }
-      ]
+      historico: (v.historico || []).concat([{
+        data:      data,
+        tipo:      'entrada',
+        tipoOp:    tipo,
+        qtd:       qtd,
+        saldoApos: novoSaldo,
+        ref:       ref,
+        ts:        Date.now()
+      }])
     }, resolve);
   });
 
-  if (qtdEl)  qtdEl.value  = '';
-  if (tipoEl) tipoEl.selectedIndex = 0;
-  if (obsEl)  obsEl.value  = '';
+  // Limpa form
+  if (qtdEl) qtdEl.value = '';
+  if (obsEl) obsEl.value = '';
+  if (wrap)  { wrap.dataset.sel = ''; _renderOpBtns(); }
+  var obsWrap = document.getElementById('v-obs-wrap');
+  if (obsWrap) obsWrap.style.display = 'none';
 
   if (alertEl) {
+    alertEl.textContent = '✓ Entrada de ' + qtd + ' VRTE (' + tipo + ') registrada com sucesso!';
     alertEl.style.display = 'block';
-    setTimeout(() => { alertEl.style.display = 'none'; }, 3000);
+    setTimeout(function(){ alertEl.style.display = 'none'; }, 4000);
   }
 
   await reloadVRTE();
   rVRTE();
+  if (typeof _atualizarMiniVRTE === 'function') _atualizarMiniVRTE();
 }
