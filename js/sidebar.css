@@ -1,0 +1,152 @@
+/* ============================================
+   SIDEBAR — Sistema 1ª Cia / 8º BPM
+   Substituir o bloco antigo de .sidebar/.ni no styles.css
+   ============================================ */
+
+.sidebar {
+  width: 260px;
+  background: #0f1c2e;
+  color: #e6eaf2;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border-right: 1px solid rgba(255,255,255,.06);
+  position: sticky;
+  top: 0;
+  flex-shrink: 0;
+}
+
+/* Cabeçalho da sidebar com logo + nome do sistema */
+.sb-header {
+  padding: 22px 20px 18px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sb-logo {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #d4a956 0%, #b8862e 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 18px;
+  color: #0f1c2e;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,.3);
+}
+.sb-title {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  min-width: 0;
+}
+.sb-title .t1 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: .3px;
+}
+.sb-title .t2 {
+  font-size: 11px;
+  color: #8a96a8;
+  margin-top: 2px;
+}
+
+/* Label de seção (NAVEGAÇÃO) */
+.sb-section {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: #6b7689;
+  padding: 18px 20px 8px;
+  text-transform: uppercase;
+}
+
+/* Itens de navegação */
+.sb-nav {
+  flex: 1;
+  padding: 0 12px;
+  overflow-y: auto;
+}
+.ni {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin: 2px 0;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #b4bccd;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background .15s, color .15s;
+  user-select: none;
+}
+.ni:hover {
+  background: rgba(255,255,255,.04);
+  color: #fff;
+}
+.ni.active {
+  background: rgba(212,169,86,.12);
+  color: #d4a956;
+}
+.ni.active .ni-icon {
+  color: #d4a956;
+}
+.ni-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: #8a96a8;
+  transition: color .15s;
+}
+.ni:hover .ni-icon {
+  color: #fff;
+}
+.ni-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ni-badge {
+  background: rgba(255,255,255,.08);
+  color: #e6eaf2;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* Rodapé da sidebar */
+.sb-footer {
+  padding: 14px 20px;
+  border-top: 1px solid rgba(255,255,255,.08);
+  font-size: 11px;
+  color: #6b7689;
+  text-align: center;
+}
+
+/* Responsivo: mobile */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%;
+    min-height: auto;
+    position: relative;
+  }
+  .sb-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .ni {
+    flex: 1 1 calc(50% - 4px);
+  }
+}

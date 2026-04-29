@@ -1,0 +1,127 @@
+/* ============================================
+   Adicionar ao final do css/styles.css
+   ============================================ */
+
+/* Linha de ações da Nova Escala */
+.actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0;
+  padding: 16px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+.actions-row button {
+  padding: 10px 18px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all .15s;
+}
+.actions-row button:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+.actions-row .btn-primary {
+  background: #1e3a5f;
+  color: #fff;
+  border-color: #1e3a5f;
+}
+.actions-row .btn-primary:hover {
+  background: #2a4a73;
+}
+.actions-row .btn-secondary {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+.actions-row .btn-secondary:hover {
+  background: #fde68a;
+}
+
+/* Botões pequenos */
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  cursor: pointer;
+}
+.btn-sm.danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+.btn-sm.danger:hover {
+  background: #fecaca;
+}
+
+/* Métrica em vermelho quando saldo zero/negativo */
+.m-value.red {
+  color: #dc2626;
+}
+
+/* Consumo por operação */
+.ops-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.op-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  align-items: center;
+}
+.op-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+.op-val {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2937;
+}
+.op-bar {
+  grid-column: 1 / -1;
+  height: 6px;
+  background: #f3f4f6;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.op-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7c2d2d, #b91c1c);
+  border-radius: 3px;
+  transition: width .3s;
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .3px;
+}
+.badge.ok {
+  background: #d1fae5;
+  color: #065f46;
+}
+.badge.bad {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Centralizar texto em células */
+.ctr {
+  text-align: center;
+}
