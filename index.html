@@ -10,6 +10,9 @@
 
 <!-- Dependências externas -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <!-- Firebase CDN -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -18,6 +21,8 @@
 
 <!-- Estilos -->
 <link rel="stylesheet" href="css/styles.css"/>
+<link rel="stylesheet" href="css/sidebar.css"/>
+<link rel="stylesheet" href="css/extras.css"/>
 </head>
 <body>
 
@@ -48,45 +53,88 @@
 ══════════════════════════════════════════ -->
 <div id="app" style="display:none;flex-direction:row;height:100vh">
 
-  <!-- Sidebar (ícones) -->
-  <div class="sb">
-    <div class="sb-logo">I</div>
+  <!-- Sidebar (texto + ícones) -->
+  <div class="sb sb-expanded">
+    <div class="sb-header">
+      <div class="sb-logo">1ª</div>
+      <div class="sb-title">
+        <span class="t1">Sistema 1ª Cia</span>
+        <span class="t2">8º BPM · ISEO</span>
+      </div>
+    </div>
+
+    <div class="sb-section">Navegação</div>
+
     <div class="sb-items">
       <div class="ni on" onclick="nav('painel',this)" title="Painel">
-        <span class="nic">◈</span>
-        <span class="ni-tooltip">Painel</span>
+        <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="9"/>
+          <rect x="14" y="3" width="7" height="5"/>
+          <rect x="14" y="12" width="7" height="9"/>
+          <rect x="3" y="16" width="7" height="5"/>
+        </svg>
+        <span class="ni-label">Painel</span>
       </div>
       <div class="ni" onclick="nav('vrte',this)" title="VRTE">
-        <span class="nic">◇</span>
-        <span class="ni-tooltip">VRTE</span>
+        <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="6" width="20" height="12" rx="2"/>
+          <circle cx="12" cy="12" r="2.5"/>
+          <path d="M6 10v.01M18 14v.01"/>
+        </svg>
+        <span class="ni-label">VRTE</span>
       </div>
       <div class="ni" onclick="nav('ops',this)" title="Operações">
-        <span class="nic">◉</span>
-        <span class="ni-tooltip">Operações</span>
+        <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/>
+          <circle cx="12" cy="12" r="5"/>
+          <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+        </svg>
+        <span class="ni-label">Operações</span>
       </div>
       <div class="ni" onclick="nav('nova',this)" title="Nova Escala">
-        <span class="nic">＋</span>
-        <span class="ni-tooltip">Nova Escala</span>
+        <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <path d="M14 2v6h6"/>
+          <line x1="12" y1="13" x2="12" y2="19"/>
+          <line x1="9" y1="16" x2="15" y2="16"/>
+        </svg>
+        <span class="ni-label">Nova Escala</span>
       </div>
       <div class="ni" onclick="nav('escalas',this)" title="Escalas">
-        <span class="nic">≡</span>
-        <span class="ni-tooltip">Escalas</span>
+        <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <path d="M14 2v6h6"/>
+          <line x1="8" y1="13" x2="16" y2="13"/>
+          <line x1="8" y1="17" x2="16" y2="17"/>
+          <line x1="8" y1="9" x2="10" y2="9"/>
+        </svg>
+        <span class="ni-label">Escalas</span>
       </div>
       <div class="ni" onclick="nav('mils',this)" title="Militares">
-        <span class="nic">◎</span>
-        <span class="ni-tooltip">Militares</span>
+        <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2 4 5v7c0 4.5 3.5 8.5 8 10 4.5-1.5 8-5.5 8-10V5l-8-3z"/>
+          <path d="M9 12l2 2 4-4"/>
+        </svg>
+        <span class="ni-label">Militares</span>
       </div>
       <div class="ni" onclick="nav('disp',this)" title="Dispensas">
-        <span class="nic">✕</span>
-        <span class="ni-tooltip">Dispensas</span>
+        <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <line x1="12" y1="8" x2="12" y2="16"/>
+          <line x1="8" y1="12" x2="16" y2="12"/>
+        </svg>
+        <span class="ni-label">Dispensas</span>
       </div>
     </div>
     <div class="sb-bottom">
       <hr class="sb-divider"/>
       <div class="sb-items">
         <div class="ni" onclick="nav('cfg',this)" title="Configurações">
-          <span class="nic">⚙</span>
-          <span class="ni-tooltip">Configurações</span>
+          <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span class="ni-label">Configurações</span>
         </div>
       </div>
     </div>
@@ -99,7 +147,7 @@
     <div class="tb">
       <div class="tb-brand">
         <span class="tbd">8º BPM · 1ª CIA</span>
-        <span class="tbt">Sistema de Escalas ISEO</span>
+        <span class="tbt">Sistema 1ª Cia do 8º BPM</span>
       </div>
       <div class="tbr">
         <span class="tbu" id="tbu"></span>
@@ -251,6 +299,7 @@
         <div class="alert aer" id="eae"></div>
         <div class="ar2">
           <button class="btn" onclick="prevEsc()">Pré-visualizar</button>
+          <button class="btn bw" onclick="limparEsc()">Limpar dados</button>
           <button class="btn brd" onclick="gerarPDF()">Baixar PDF</button>
           <button class="btn bg2" onclick="gerarDocx()">Baixar DOCX</button>
           <button class="btn bp" onclick="salvarEsc()">Salvar escala</button>
@@ -386,6 +435,7 @@ var TMPL_B64="UEsDBBQAAAAIAIFdlVzJf3/HuAEAABMJAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbL
 <script src="js/militares.js"></script>
 <script src="js/config.js"></script>
 <script src="js/dispensas.js"></script>
+<script src="js/patches.js"></script>
 
 </body>
 </html>

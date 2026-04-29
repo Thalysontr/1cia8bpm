@@ -1,0 +1,178 @@
+/* ═══════════════════════════════════════════════════════════════
+   SIDEBAR EXPANDIDA — Sistema 1ª Cia / 8º BPM
+   Sobrepõe estilos antigos de .sb (sidebar só de ícones)
+   ═══════════════════════════════════════════════════════════════ */
+
+.sb.sb-expanded {
+  width: 240px !important;
+  min-width: 240px !important;
+  max-width: 240px !important;
+  background: #0f1c2e;
+  color: #e6eaf2;
+  display: flex;
+  flex-direction: column;
+  padding: 0 !important;
+  border-right: 1px solid rgba(255,255,255,.06);
+  height: 100vh;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+/* Esconde o logo antigo .sb-logo solto (substituído pelo .sb-header) */
+.sb.sb-expanded > .sb-logo:not(.sb-header .sb-logo) {
+  display: none;
+}
+
+/* ───── Cabeçalho com logo + título ───── */
+.sb.sb-expanded .sb-header {
+  padding: 22px 18px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sb.sb-expanded .sb-header .sb-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #d4a956 0%, #b8862e 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  color: #0f1c2e;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  font-family: 'Playfair Display', serif;
+}
+.sb.sb-expanded .sb-title {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  min-width: 0;
+}
+.sb.sb-expanded .sb-title .t1 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: .2px;
+  font-family: 'DM Sans', sans-serif;
+}
+.sb.sb-expanded .sb-title .t2 {
+  font-size: 11px;
+  color: #8a96a8;
+  margin-top: 2px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* ───── Label "NAVEGAÇÃO" ───── */
+.sb.sb-expanded .sb-section {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: #6b7689;
+  padding: 18px 18px 8px;
+  text-transform: uppercase;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* ───── Container de itens ───── */
+.sb.sb-expanded .sb-items {
+  display: flex;
+  flex-direction: column;
+  padding: 0 10px;
+  flex: 1;
+  gap: 0;
+}
+
+/* ───── Cada item da navegação ───── */
+.sb.sb-expanded .ni {
+  display: flex !important;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px !important;
+  margin: 2px 0 !important;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #b4bccd !important;
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: background .15s, color .15s;
+  user-select: none;
+  width: auto !important;
+  height: auto !important;
+  background: transparent !important;
+  border: none !important;
+  position: relative;
+  font-family: 'DM Sans', sans-serif;
+}
+.sb.sb-expanded .ni:hover {
+  background: rgba(255,255,255,.04) !important;
+  color: #fff !important;
+}
+.sb.sb-expanded .ni.on {
+  background: rgba(212,169,86,.12) !important;
+  color: #d4a956 !important;
+}
+.sb.sb-expanded .ni.on .ni-icon {
+  color: #d4a956 !important;
+  stroke: #d4a956 !important;
+}
+
+/* ───── Ícone SVG ───── */
+.sb.sb-expanded .ni-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: #8a96a8;
+  stroke: #8a96a8;
+  transition: color .15s, stroke .15s;
+}
+.sb.sb-expanded .ni:hover .ni-icon {
+  color: #fff;
+  stroke: #fff;
+}
+
+/* ───── Label do item ───── */
+.sb.sb-expanded .ni-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Esconde tooltip antigo (não precisa, tem label visível) */
+.sb.sb-expanded .ni-tooltip {
+  display: none !important;
+}
+.sb.sb-expanded .nic {
+  display: none !important;
+}
+
+/* ───── Bottom: divisor + configurações ───── */
+.sb.sb-expanded .sb-bottom {
+  margin-top: auto;
+  padding-bottom: 14px;
+}
+.sb.sb-expanded .sb-divider {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,.08);
+  margin: 8px 18px 8px;
+}
+
+/* ───── Ajuste do conteúdo principal — mais largo agora ───── */
+.ml {
+  margin-left: 0 !important;
+}
+
+/* ───── Mobile ───── */
+@media (max-width: 768px) {
+  .sb.sb-expanded {
+    width: 100% !important;
+    min-width: auto !important;
+    max-width: none !important;
+    height: auto;
+    position: relative;
+  }
+}

@@ -1,0 +1,48 @@
+/* ═══════════════════════════════════════════════════════════════
+   ESTILOS EXTRAS — botão Limpar e refinamentos
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Botão "Limpar dados" — amarelo discreto */
+.btn.bw {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+.btn.bw:hover {
+  background: #fde68a;
+  border-color: #f59e0b;
+}
+
+/* Linha de escala cancelada (visualmente fraca) */
+tr.escala-cancelada {
+  opacity: 0.55;
+  background: #fafafa;
+}
+tr.escala-cancelada td {
+  text-decoration: line-through;
+  color: #6b7280;
+}
+
+/* Badge de status cancelada */
+.badge-cancelada {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+}
+.badge-ativa {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #d1fae5;
+  color: #065f46;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+}
