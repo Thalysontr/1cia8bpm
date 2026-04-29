@@ -118,25 +118,15 @@ async function rVRTE() {
   html += `</div></div></div>
 
     <div class="card">
-      <h3>Registrar entrada de VRTE</h3>
+      <h3>Registrar movimento</h3>
       <div class="form-row">
-        <div style="display:flex;flex-direction:column;gap:4px;flex:1">
-          <label style="font-size:.8rem;font-weight:600">Data</label>
-          <input type="date" id="vrte-data" value="${new Date().toISOString().split('T')[0]}">
-        </div>
-        <div style="display:flex;flex-direction:column;gap:4px;flex:1">
-          <label style="font-size:.8rem;font-weight:600">Quantidade</label>
-          <input type="number" id="vrte-quantidade" placeholder="Ex: 500" min="1">
-        </div>
-      </div>
-      <div class="form-row" style="margin-top:8px">
-        <div style="display:flex;flex-direction:column;gap:4px;flex:1">
-          <label style="font-size:.8rem;font-weight:600">Observação</label>
-          <input type="text" id="vrte-obs" placeholder="Ex: Lote referência abril/2026">
-        </div>
-      </div>
-      <div style="display:flex;justify-content:flex-end;margin-top:12px">
-        <button onclick="regVRTE()">Registrar entrada</button>
+        <select id="vrte-tipo">
+          <option value="entrada">Entrada</option>
+          <option value="saida">Saída manual</option>
+        </select>
+        <input type="number" id="vrte-qtd" placeholder="Quantidade" min="1">
+        <input type="text" id="vrte-ref" placeholder="Referência (ex: Repasse mensal)">
+        <button onclick="regVRTE()">Registrar</button>
       </div>
     </div>
 
@@ -220,22 +210,23 @@ function renderVRTEChart(hist) {
 }
 
 async function regVRTE() {
-  const dataEl = document.getElementById('vrte-data');
-  const qtdEl  = document.getElementById('vrte-quantidade');
-  const obsEl  = document.getElementById('vrte-obs');
+  const dataEl  = document.getElementById('vd');
+  const qtdEl   = document.getElementById('vq');
+  const tipoEl  = document.getElementById('vtipo');
+  const obsEl   = document.getElementById('vo');
+  const alertEl = document.getElementById('va');
 
-  if (!dataEl || !qtdEl || !obsEl) {
-    alert('Erro interno: campos do formulário não encontrados.');
-    return;
-  }
+  const data  = dataEl  ? dataEl.value  : '';
+  const qtd   = qtdEl   ? parseInt(qtdEl.value) : 0;
+  const tipo  = tipoEl  ? tipoEl.value.trim()   : '';
+  const obs   = obsEl   ? obsEl.value.trim()     : '';
 
-  const data = dataEl.value;
-  const qtd  = parseInt(qtdEl.value);
-  const obs  = obsEl.value.trim();
+  if (!data)           { alert('Informe a data.'); return; }
+  if (!qtd || qtd <= 0){ alert('Quantidade inválida.'); return; }
+  if (!tipo)           { alert('Selecione o tipo de operação.'); return; }
 
-  if (!data) { alert('Informe a data.'); return; }
-  if (!qtd || qtd <= 0) { alert('Quantidade inválida.'); return; }
-  if (!obs) { alert('Informe a observação/referência.'); return; }
+  // Monta referência: "Colheita — Lote referência abril/2026" ou só "Colheita"
+  const ref = obs ? `${tipo} — ${obs}` : tipo;
 
   const v = APP.vrte || { saldo: 0, historico: [] };
   const novoSaldo = (v.saldo || 0) + qtd;
@@ -247,17 +238,25 @@ async function regVRTE() {
       {
         data,
         tipo: 'entrada',
+        tipoOp: tipo,
         qtd,
         saldoApos: novoSaldo,
-        ref: obs,
+        ref,
         ts: Date.now()
       }
     ]
   });
 
-  // Limpa os campos
-  qtdEl.value = '';
-  obsEl.value = '';
+  // Limpa campos
+  if (qtdEl)  qtdEl.value  = '';
+  if (tipoEl) tipoEl.value = '';
+  if (obsEl)  obsEl.value  = '';
+
+  // Mostra alerta de sucesso
+  if (alertEl) {
+    alertEl.style.display = 'block';
+    setTimeout(() => { alertEl.style.display = 'none'; }, 3000);
+  }
 
   await reloadVRTE();
   rVRTE();
