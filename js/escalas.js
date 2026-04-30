@@ -1,128 +1,145 @@
-// js/escalas.js — Listagem de escalas geradas + exclusão com estorno VRTE
-// CORREÇÃO: estorno SEMPRE registra movimento (independente de status anterior)
-//           e ESCALAS CANCELADAS não consomem VRTE no cálculo
+// ═══════════════════════════════════════════════════════════════
+// escalas.js — Listagem de escalas geradas + cancelamento com estorno VRTE
+// 1ª CIA / 8º BPM · Sistema ISEO
+//
+// IDs reais do index.html:
+//   - Painel:  #pe
+//   - Tabela:  #etb
+//
+// API real do db.js:
+//   - DB.saveEsc(esc, cb)
+//   - DB.deleteEsc(id, cb)
+//   - DB.saveVrte(vrte, cb)
+//   - DB.getEscs(cb)
+//   - reloadEscs(cb)
+//   - reloadVrte(cb)
+// ═══════════════════════════════════════════════════════════════
 
-async function rEscs() {
-  const p = document.getElementById('pescs');
-  if (!p) return;
-
-  const escs = (APP.escs || []).slice().sort((a, b) => {
-    const da = a.data || '';
-    const db = b.data || '';
-    return db.localeCompare(da);
-  });
-
-  let html = `
-    <h1>Escalas geradas</h1>
-    <p class="muted">Histórico completo</p>
-    <div class="card">
-      <h3>Todas as escalas</h3>
-      <table class="tbl">
-        <thead>
-          <tr>
-            <th>Data</th>
-            <th>Operação</th>
-            <th>Município</th>
-            <th>Dur.</th>
-            <th>VRTE</th>
-            <th>Militares</th>
-            <th>Status</th>
-            <th>Ações</th>
-          </tr>
-        </thead>
-        <tbody>`;
-
-  if (!escs.length) {
-    html += `<tr><td colspan="8" class="muted ctr">Nenhuma escala registrada.</td></tr>`;
-  } else {
-    escs.forEach(e => {
-      const cancelada = e.cancelada === true || e.status === 'cancelada';
-      const vrteExibido = cancelada ? 0 : (e.vrteTotal || 0);
-      const statusBadge = cancelada
-        ? '<span class="badge bad">Cancelada</span>'
-        : '<span class="badge ok">Ativa</span>';
-      const militares = (e.militares || []).length;
-
-      html += `
-        <tr ${cancelada ? 'style="opacity:.55"' : ''}>
-          <td>${fd(e.data)}</td>
-          <td>${esc(e.operacao || '—')}</td>
-          <td>${esc(e.municipio || '—')}</td>
-          <td>${e.duracao || '—'}h</td>
-          <td>${vrteExibido}</td>
-          <td>${militares}</td>
-          <td>${statusBadge}</td>
-          <td>
-            ${cancelada
-              ? '<span class="muted">—</span>'
-              : `<button class="btn-sm danger" onclick="excluirEscala('${e.id}')">Excluir</button>`}
-          </td>
-        </tr>`;
-    });
+function rEscs() {
+  var tb = document.getElementById('etb');
+  if (!tb) {
+    console.warn('[rEscs] elemento #etb não encontrado');
+    return;
   }
 
-  html += `</tbody></table></div>`;
-  p.innerHTML = html;
+  var escs = (APP.escs || []).slice().sort(function(a, b) {
+    return (b.data || '').localeCompare(a.data || '');
+  });
+
+  if (!escs.length) {
+    tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:20px">Nenhuma escala registrada.</td></tr>';
+    return;
+  }
+
+  tb.innerHTML = escs.map(function(e) {
+    var cancelada = e.cancelada === true || e.status === 'cancelada';
+    var vrteExibido = cancelada ? 0 : (e.vrteTotal || 0);
+    var militares = (e.militares || []).length;
+    var idSafe = (e.id || '').replace(/'/g, "\\'");
+    var opSafe = (e.operacao || '').replace(/'/g, "\\'");
+
+    var statusBadge = cancelada
+      ? '<span class="badge brd">Cancelada</span>'
+      : '<span class="badge bgg">Ativa</span>';
+
+    var acaoCell = cancelada
+      ? '<span style="color:var(--t3)">—</span>'
+      : '<button class="btn brd bsm" onclick="cancelarEscala(\'' + idSafe + '\')" title="Cancelar e estornar VRTE">× Cancelar</button>';
+
+    return '<tr' + (cancelada ? ' style="opacity:.55"' : '') + '>' +
+      '<td>' + (typeof fd === 'function' ? fd(e.data) : (e.data || '—')) + '</td>' +
+      '<td><strong>' + esc(e.operacao || '—') + '</strong>' + (cancelada ? ' ' + statusBadge : '') + '</td>' +
+      '<td>' + esc(e.municipio || '—') + '</td>' +
+      '<td style="text-align:center">' + (e.duracao || '—') + 'h</td>' +
+      '<td style="text-align:center">' + vrteExibido + '</td>' +
+      '<td style="text-align:center">' + militares + '</td>' +
+      '<td>' + acaoCell + '</td>' +
+      '</tr>';
+  }).join('');
 }
 
-async function excluirEscala(id) {
-  const escala = (APP.escs || []).find(e => e.id === id);
+// ═══════════════════════════════════════════════════════════════
+// Cancela a escala (marca como cancelada + estorna VRTE)
+// ═══════════════════════════════════════════════════════════════
+function cancelarEscala(id) {
+  var escala = (APP.escs || []).find(function(e) { return e.id === id; });
   if (!escala) {
     alert('Escala não encontrada.');
     return;
   }
 
-  if (escala.cancelada) {
+  if (escala.cancelada || escala.status === 'cancelada') {
     alert('Esta escala já foi cancelada.');
     return;
   }
 
-  const confirma = confirm(
-    `Excluir escala de ${fd(escala.data)} — ${escala.operacao}?\n\n` +
-    `Isso irá ESTORNAR ${escala.vrteTotal || 0} VRTE para o saldo.`
-  );
-  if (!confirma) return;
+  var vrteValor = escala.vrteTotal || 0;
+  var msg = 'Cancelar a escala de ' + (typeof fd === 'function' ? fd(escala.data) : escala.data) +
+            ' — ' + (escala.operacao || '(sem operação)') + '?';
+  if (vrteValor > 0) msg += '\n\nIsso irá ESTORNAR ' + vrteValor + ' VRTE para o saldo.';
 
-  try {
-    // 1) Marca a escala como cancelada (não deleta — mantém histórico)
-    await DB.saveEscala({
-      ...escala,
-      cancelada: true,
-      status: 'cancelada',
-      canceladaEm: new Date().toISOString()
-    });
+  if (!confirm(msg)) return;
 
-    // 2) ESTORNA VRTE — sempre registra, mesmo que saldo já esteja em 0
-    const vrteAtual = APP.vrte || { saldo: 0, historico: [] };
-    const valorEstorno = escala.vrteTotal || 0;
+  // 1) Marca a escala como cancelada (mantém histórico)
+  var escalaCancelada = Object.assign({}, escala, {
+    cancelada: true,
+    status: 'cancelada',
+    canceladaEm: new Date().toISOString()
+  });
 
-    if (valorEstorno > 0) {
-      const novoSaldo = (vrteAtual.saldo || 0) + valorEstorno;
-      const movimento = {
-        data: new Date().toISOString().split('T')[0],
-        tipo: 'entrada',
-        qtd: valorEstorno,
-        saldoApos: novoSaldo,
-        ref: `Estorno — exclusão de escala ${escala.operacao} (${fd(escala.data)})`,
-        ts: Date.now()
-      };
+  if (typeof DB === 'undefined' || typeof DB.saveEsc !== 'function') {
+    alert('Erro: DB.saveEsc não disponível. Recarregue a página.');
+    return;
+  }
 
-      await DB.saveVRTE({
-        saldo: novoSaldo,
-        historico: [...(vrteAtual.historico || []), movimento]
+  DB.saveEsc(escalaCancelada, function() {
+
+    // 2) Estorna VRTE se necessário
+    function finalizarCancelamento() {
+      reloadEscs(function() {
+        reloadVrte(function() {
+          rEscs();
+          alert('✅ Escala cancelada e VRTE estornado com sucesso.');
+        });
       });
     }
 
-    // 3) Recarrega caches
-    await reloadEscs();
-    await reloadVRTE();
+    if (vrteValor > 0 && typeof DB.saveVrte === 'function') {
+      var v = APP.vrte || { saldo: 0, hist: [] };
+      var saldoAtual = typeof v.saldo === 'number' ? v.saldo : 0;
+      var novoSaldo = saldoAtual + vrteValor;
+      var hist = (v.hist || v.historico || []).slice();
+      hist.push({
+        data: new Date().toISOString().split('T')[0],
+        tipo: 'entrada',
+        qtd: vrteValor,
+        saldoApos: novoSaldo,
+        ref: 'Estorno — cancelamento de escala ' + (escala.operacao || '') + ' (' + (escala.data || '') + ')',
+        ts: Date.now()
+      });
 
-    // 4) Re-renderiza tela atual
-    rEscs();
+      DB.saveVrte({ saldo: novoSaldo, hist: hist, historico: hist }, function() {
+        finalizarCancelamento();
+      });
+    } else {
+      finalizarCancelamento();
+    }
+  });
+}
 
-    alert('Escala cancelada e VRTE estornado com sucesso.');
-  } catch (err) {
-    console.error('Erro ao excluir escala:', err);
-    alert('Erro ao excluir escala: ' + err.message);
-  }
+// ═══════════════════════════════════════════════════════════════
+// Compatibilidade: alias antigo
+// ═══════════════════════════════════════════════════════════════
+function excluirEscala(id) {
+  return cancelarEscala(id);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Utilitário: retorna apenas escalas ativas (não canceladas)
+// Usado por VRTE e Painel pra calcular consumo correto
+// ═══════════════════════════════════════════════════════════════
+function escsAtivas() {
+  return (APP.escs || []).filter(function(e) {
+    return e && e.cancelada !== true && e.status !== 'cancelada';
+  });
 }
