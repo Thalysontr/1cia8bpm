@@ -1358,12 +1358,14 @@ function _gerarPDFFromEscala(d) {
     y += 9;
 
     // ─── TURNOS (cada turno = bloco com missão + horário + tabela) ───
+    // Numeração contínua entre turnos (1,2 / 3,4,5...) — fidedigno ao modelo
+    var contadorMilPdf = 0;
     d.turnos.forEach(function(t, ti) {
       y = checkPage(y, 50);
 
-      // 1) Missão (caixa simples com borda)
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
+      // 1) Missão (caixa com borda — texto em NEGRITO centralizado, igual ao modelo)
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
       var missao = t.missao || _MISSAO_PADRAO;
       var lines = doc.splitTextToSize(missao, contentW - 6);
       var mh = lines.length * 4 + 3;
@@ -1373,7 +1375,7 @@ function _gerarPDFFromEscala(d) {
       doc.text(lines, W/2, y+4, { align:'center' });
       y += mh;
 
-      // 2) Horário (faixa amarela)
+      // 2) Horário (faixa amarela, colada na missão)
       doc.setFillColor(255, 245, 157);
       doc.rect(M, y, contentW, 6, 'FD');
       doc.setFont('helvetica', 'bold');
@@ -1391,10 +1393,10 @@ function _gerarPDFFromEscala(d) {
 
       var headers = ['Ordem', 'Posto/Grad.', 'Nome Completo', 'RG', 'NF', 'Função'];
 
-      // Cabeçalho
-      doc.setFillColor(245, 245, 245);
-      doc.rect(M, y, contentW, 6, 'FD');
-      doc.setFontSize(9);
+      // Cabeçalho — fundo branco, negrito, igual modelo
+      doc.rect(M, y, contentW, 6);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
       var x = M;
       headers.forEach(function(h, i) {
         doc.text(h, x + colW[i]/2, y+4, { align:'center' });
@@ -1446,8 +1448,9 @@ function _gerarPDFFromEscala(d) {
           var rowH = Math.max(6, (nomeMultilinha ? nomeLines.length : 1) * 4 + 2);
           doc.rect(M, y, contentW, rowH);
 
+          contadorMilPdf++;
           var cells = [
-            String(mi + 1) + '.',
+            String(contadorMilPdf) + '.',
             m.posto || '',
             null, // o nome é renderizado separadamente
             m.rg || '',
@@ -1476,7 +1479,8 @@ function _gerarPDFFromEscala(d) {
                 doc.text(nomeLines, x + colW[i]/2, y + 4, { align:'center' });
               }
             } else {
-              doc.setFont('helvetica', 'normal');
+              // Coluna Ordem (i=0) em negrito, demais em normal
+              doc.setFont('helvetica', i === 0 ? 'bold' : 'normal');
               var lns = doc.splitTextToSize(String(c), colW[i] - 1);
               doc.text(lns, x + colW[i]/2, y + (rowH/2) + 1, { align:'center' });
             }
@@ -1661,22 +1665,68 @@ function _gerarPDFFromEscala(d) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// _carregarDocxLib — garante que a biblioteca docx esteja disponível
+//   Tenta resolver de window.docx e, se ausente, carrega via CDN.
+// ═══════════════════════════════════════════════════════════════
+function _carregarDocxLib(cb) {
+  // 1) Resolve a referência onde quer que esteja
+  var lib = (typeof window !== 'undefined' && window.docx) ? window.docx
+          : (typeof docx !== 'undefined' ? docx : null);
+
+  if (lib && lib.Document && lib.Packer) { cb(lib); return; }
+
+  // 2) Tenta carregar do CDN dinamicamente
+  console.warn('Biblioteca docx ausente. Tentando carregar do CDN...');
+  var cdns = [
+    'https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.js',
+    'https://unpkg.com/docx@8.5.0/build/index.umd.js',
+    'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js'
+  ];
+
+  function tentar(i) {
+    if (i >= cdns.length) {
+      alert('Biblioteca docx não pôde ser carregada.\n\nVerifique sua conexão ou inclua o script no index.html:\n<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.js"></script>');
+      return;
+    }
+    var s = document.createElement('script');
+    s.src = cdns[i];
+    s.onload = function() {
+      var lib2 = window.docx || (typeof docx !== 'undefined' ? docx : null);
+      if (lib2 && lib2.Document && lib2.Packer) {
+        console.log('docx carregado via', cdns[i]);
+        cb(lib2);
+      } else {
+        tentar(i + 1);
+      }
+    };
+    s.onerror = function() {
+      console.warn('Falha ao carregar docx de', cdns[i]);
+      tentar(i + 1);
+    };
+    document.head.appendChild(s);
+  }
+  tentar(0);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // _gerarDocxFromEscala
 // ═══════════════════════════════════════════════════════════════
 function _gerarDocxFromEscala(d) {
-  if (typeof docx === 'undefined') {
-    alert('Biblioteca docx não carregada.');
-    return;
-  }
+  _carregarDocxLib(function(docxLib) {
+    _gerarDocxFromEscalaImpl(d, docxLib);
+  });
+}
 
+function _gerarDocxFromEscalaImpl(d, docxLib) {
   d = _normalizaEscala(d);
 
   try {
-    var Document = docx.Document, Packer = docx.Packer, Paragraph = docx.Paragraph,
-        TextRun = docx.TextRun, AlignmentType = docx.AlignmentType,
-        Table = docx.Table, TableRow = docx.TableRow, TableCell = docx.TableCell,
-        WidthType = docx.WidthType, ImageRun = docx.ImageRun,
-        BorderStyle = docx.BorderStyle, ShadingType = docx.ShadingType;
+    var Document = docxLib.Document, Packer = docxLib.Packer, Paragraph = docxLib.Paragraph,
+        TextRun = docxLib.TextRun, AlignmentType = docxLib.AlignmentType,
+        Table = docxLib.Table, TableRow = docxLib.TableRow, TableCell = docxLib.TableCell,
+        WidthType = docxLib.WidthType, ImageRun = docxLib.ImageRun,
+        BorderStyle = docxLib.BorderStyle, ShadingType = docxLib.ShadingType,
+        VerticalAlign = docxLib.VerticalAlign, HeightRule = docxLib.HeightRule;
 
     var children = [];
     var diaSem = d.data ? new Date(d.data + 'T12:00:00').toLocaleDateString('pt-BR', { weekday:'long' }).toUpperCase() : '';
@@ -1781,53 +1831,83 @@ function _gerarDocxFromEscala(d) {
     }));
     children.push(new Paragraph({ text:'' }));
 
-    // Turnos
+    // Turnos — fidedigno ao modelo PMES:
+    //   A tabela tem 4 linhas mescladas no topo:
+    //     1) Missão (negrito centralizado)
+    //     2) Horário com fundo AMARELO
+    //   Depois vem o cabeçalho (Ordem | Posto/Grad. | Nome | RG | NF | Função)
+    //   E em seguida as linhas dos militares.
+    //   IMPORTANTE: numeração dos militares é CONTÍNUA entre turnos (1,2 / 3,4,5).
+    var contadorMil = 0;
     d.turnos.forEach(function(t) {
-      // Missão (caixa centralizada)
-      children.push(new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: t.missao || _MISSAO_PADRAO, italics:true, size:20 })]
-      }));
-      // Horário (faixa amarela)
-      children.push(new Paragraph({
-        alignment: AlignmentType.CENTER,
-        shading: { type: ShadingType.SOLID, color: 'FFF59D', fill: 'FFF59D' },
-        children: [new TextRun({ text: 'Horário da escala: ' + _horarioLabel(t), bold:true, size:22 })]
-      }));
-
       var headers = ['Ordem', 'Posto/Grad.', 'Nome Completo', 'RG', 'NF', 'Função'];
+
+      // Linha 1: Missão (mesclada em 6 colunas)
+      var rowMissao = new TableRow({
+        children: [new TableCell({
+          columnSpan: 6,
+          children: [new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: t.missao || _MISSAO_PADRAO, bold: true, size: 20 })]
+          })]
+        })]
+      });
+
+      // Linha 2: Horário (mesclada em 6 colunas, fundo amarelo)
+      var rowHorario = new TableRow({
+        children: [new TableCell({
+          columnSpan: 6,
+          shading: { type: ShadingType.SOLID, color: 'FFF59D', fill: 'FFF59D' },
+          children: [new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: 'Horário da escala: ' + _horarioLabel(t), bold: true, size: 20 })]
+          })]
+        })]
+      });
+
+      // Linha 3: Cabeçalho da tabela
       var headerRow = new TableRow({
+        tableHeader: true,
         children: headers.map(function(h) {
           return new TableCell({
-            shading: { type: ShadingType.SOLID, color: 'F0F0F0', fill: 'F0F0F0' },
-            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:h, bold:true })] })]
+            children: [new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [new TextRun({ text: h, bold: true, size: 20 })]
+            })]
           });
         })
       });
+
+      // Linhas dos militares
       var milRows = (t.mils || []).map(function(m, mi) {
+        contadorMil++;
         // Nome com sobrenome em NEGRITO (3 runs)
         var np = _splitNomeNegrito(m.nome || '');
         var nomeRuns = [];
-        if (np.antes)   nomeRuns.push(new TextRun(np.antes));
-        if (np.negrito) nomeRuns.push(new TextRun({ text: np.negrito, bold: true }));
-        if (np.depois)  nomeRuns.push(new TextRun(np.depois));
-        if (!nomeRuns.length) nomeRuns.push(new TextRun(m.nome || ''));
+        if (np.antes)   nomeRuns.push(new TextRun({ text: np.antes, size: 20 }));
+        if (np.negrito) nomeRuns.push(new TextRun({ text: np.negrito, bold: true, size: 20 }));
+        if (np.depois)  nomeRuns.push(new TextRun({ text: np.depois, size: 20 }));
+        if (!nomeRuns.length) nomeRuns.push(new TextRun({ text: m.nome || '', size: 20 }));
 
         var celulas = [
-          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(String((mi+1)+'.'))] })] }),
-          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(String(m.posto||''))] })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(contadorMil+'.'), bold: true, size: 20 })] })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(m.posto||''), size: 20 })] })] }),
           new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: nomeRuns })] }),
-          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(String(m.rg||''))] })] }),
-          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(String(m.nf||''))] })] }),
-          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(String(m.funcao||''))] })] })
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(m.rg||''), size: 20 })] })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(m.nf||''), size: 20 })] })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(m.funcao||''), size: 20 })] })] })
         ];
         return new TableRow({ children: celulas });
       });
       if (!milRows.length) {
-        milRows.push(new TableRow({ children: [new TableCell({ children:[new Paragraph({ alignment: AlignmentType.CENTER, children:[new TextRun({ text:'(Sem militares)', italics:true })] })], columnSpan:6 })] }));
+        milRows.push(new TableRow({ children: [new TableCell({ columnSpan: 6, children:[new Paragraph({ alignment: AlignmentType.CENTER, children:[new TextRun({ text:'(Sem militares)', italics:true, size: 20 })] })] })] }));
       }
-      children.push(new Table({ width:{ size:100, type:WidthType.PERCENTAGE }, rows:[headerRow].concat(milRows) }));
-      children.push(new Paragraph({ text:'' }));
+
+      children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [rowMissao, rowHorario, headerRow].concat(milRows)
+      }));
+      children.push(new Paragraph({ text: '' }));
     });
 
     // Determinações
