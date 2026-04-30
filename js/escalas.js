@@ -1,18 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
-// escalas.js — Listagem de escalas geradas + cancelamento com estorno VRTE
+// escalas.js — Listagem de escalas geradas
 // 1ª CIA / 8º BPM · Sistema ISEO
 //
-// IDs reais do index.html:
-//   - Painel:  #pe
-//   - Tabela:  #etb
-//
-// API real do db.js:
-//   - DB.saveEsc(esc, cb)
-//   - DB.deleteEsc(id, cb)
-//   - DB.saveVrte(vrte, cb)
-//   - DB.getEscs(cb)
-//   - reloadEscs(cb)
-//   - reloadVrte(cb)
+// IDs do index.html: painel=#pe, tbody=#etb
 // ═══════════════════════════════════════════════════════════════
 
 function rEscs() {
@@ -34,32 +24,35 @@ function rEscs() {
   tb.innerHTML = escs.map(function(e) {
     var cancelada = e.cancelada === true || e.status === 'cancelada';
     var vrteExibido = cancelada ? 0 : (e.vrteTotal || 0);
-    var militares = (e.militares || []).length;
+    var militares = (e.militares && e.militares.length) || 0;
     var idSafe = (e.id || '').replace(/'/g, "\\'");
-    var opSafe = (e.operacao || '').replace(/'/g, "\\'");
 
     var statusBadge = cancelada
       ? '<span class="badge brd">Cancelada</span>'
-      : '<span class="badge bgg">Ativa</span>';
+      : '';
 
-    var acaoCell = cancelada
+    var acoes = cancelada
       ? '<span style="color:var(--t3)">—</span>'
-      : '<button class="btn brd bsm" onclick="cancelarEscala(\'' + idSafe + '\')" title="Cancelar e estornar VRTE">× Cancelar</button>';
+      : '<div style="display:flex;gap:4px;flex-wrap:wrap">' +
+        '<button class="btn bsm" onclick="baixarPDFEscala(\'' + idSafe + '\')" title="Baixar PDF">📄 PDF</button>' +
+        '<button class="btn bsm" onclick="baixarDocxEscala(\'' + idSafe + '\')" title="Baixar DOCX">📝 DOCX</button>' +
+        '<button class="btn brd bsm" onclick="cancelarEscala(\'' + idSafe + '\')" title="Cancelar e estornar VRTE">× Cancelar</button>' +
+        '</div>';
 
     return '<tr' + (cancelada ? ' style="opacity:.55"' : '') + '>' +
       '<td>' + (typeof fd === 'function' ? fd(e.data) : (e.data || '—')) + '</td>' +
-      '<td><strong>' + esc(e.operacao || '—') + '</strong>' + (cancelada ? ' ' + statusBadge : '') + '</td>' +
+      '<td><strong>' + esc(e.operacao || '—') + '</strong>' + (statusBadge ? ' ' + statusBadge : '') + '</td>' +
       '<td>' + esc(e.municipio || '—') + '</td>' +
       '<td style="text-align:center">' + (e.duracao || '—') + 'h</td>' +
       '<td style="text-align:center">' + vrteExibido + '</td>' +
       '<td style="text-align:center">' + militares + '</td>' +
-      '<td>' + acaoCell + '</td>' +
+      '<td>' + acoes + '</td>' +
       '</tr>';
   }).join('');
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Cancela a escala (marca como cancelada + estorna VRTE)
+// CANCELAR ESCALA — estorna VRTE
 // ═══════════════════════════════════════════════════════════════
 function cancelarEscala(id) {
   var escala = (APP.escs || []).find(function(e) { return e.id === id; });
@@ -80,7 +73,6 @@ function cancelarEscala(id) {
 
   if (!confirm(msg)) return;
 
-  // 1) Marca a escala como cancelada (mantém histórico)
   var escalaCancelada = Object.assign({}, escala, {
     cancelada: true,
     status: 'cancelada',
@@ -93,9 +85,7 @@ function cancelarEscala(id) {
   }
 
   DB.saveEsc(escalaCancelada, function() {
-
-    // 2) Estorna VRTE se necessário
-    function finalizarCancelamento() {
+    function finalizar() {
       reloadEscs(function() {
         reloadVrte(function() {
           rEscs();
@@ -110,6 +100,7 @@ function cancelarEscala(id) {
       var novoSaldo = saldoAtual + vrteValor;
       var hist = (v.hist || v.historico || []).slice();
       hist.push({
+        id: 'mov_' + Date.now(),
         data: new Date().toISOString().split('T')[0],
         tipo: 'entrada',
         qtd: vrteValor,
@@ -118,28 +109,50 @@ function cancelarEscala(id) {
         ts: Date.now()
       });
 
-      DB.saveVrte({ saldo: novoSaldo, hist: hist, historico: hist }, function() {
-        finalizarCancelamento();
-      });
+      DB.saveVrte({ saldo: novoSaldo, hist: hist, historico: hist }, finalizar);
     } else {
-      finalizarCancelamento();
+      finalizar();
     }
   });
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Compatibilidade: alias antigo
-// ═══════════════════════════════════════════════════════════════
-function excluirEscala(id) {
-  return cancelarEscala(id);
-}
+function excluirEscala(id) { return cancelarEscala(id); }
 
-// ═══════════════════════════════════════════════════════════════
-// Utilitário: retorna apenas escalas ativas (não canceladas)
-// Usado por VRTE e Painel pra calcular consumo correto
-// ═══════════════════════════════════════════════════════════════
 function escsAtivas() {
   return (APP.escs || []).filter(function(e) {
     return e && e.cancelada !== true && e.status !== 'cancelada';
   });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BAIXAR PDF / DOCX DE UMA ESCALA EXISTENTE
+// Reutiliza as funções gerarPDF/gerarDocx do escala.js
+// ═══════════════════════════════════════════════════════════════
+function _carregarEscalaNoForm(escala) {
+  // Salva o estado atual e popula o "form" virtual com os dados da escala
+  // As funções gerarPDF/gerarDocx leem de getEscData() que lê dos campos do form.
+  // Para escalas históricas, vamos usar uma rota direta sem form.
+  if (typeof window._gerarDocFromEscala !== 'function') {
+    console.warn('Função _gerarDocFromEscala não disponível');
+  }
+}
+
+function baixarPDFEscala(id) {
+  var escala = (APP.escs || []).find(function(e) { return e.id === id; });
+  if (!escala) { alert('Escala não encontrada.'); return; }
+  if (typeof _gerarPDFFromEscala === 'function') {
+    _gerarPDFFromEscala(escala);
+  } else {
+    alert('Função de gerar PDF não disponível. Recarregue a página.');
+  }
+}
+
+function baixarDocxEscala(id) {
+  var escala = (APP.escs || []).find(function(e) { return e.id === id; });
+  if (!escala) { alert('Escala não encontrada.'); return; }
+  if (typeof _gerarDocxFromEscala === 'function') {
+    _gerarDocxFromEscala(escala);
+  } else {
+    alert('Função de gerar DOCX não disponível. Recarregue a página.');
+  }
 }

@@ -2,22 +2,16 @@
 // painel.js — Painel geral (dashboard)
 // 1ª CIA / 8º BPM · Sistema ISEO
 //
-// CORRIGIDO:
-//   - Usa os nomes corretos dos campos da escala:
-//       op → operacao, dur → duracao, vrte → vrteTotal,
-//       nmils → militares.length, turnos[].mils[].nome/posto
-//   - Ignora escalas canceladas no consumo de VRTE
-//   - Proteção contra NaN/undefined
+// Saldo VRTE calculado SEMPRE a partir do histórico:
+//     saldo = soma(entradas) - soma(saídas)
 // ═══════════════════════════════════════════════════════════════
 
-// Helper: pega o valor preferindo o campo novo, com fallback no antigo
 function _opNome(x) { return x.operacao || x.op || '—'; }
 function _dur(x)    { return x.duracao  || x.dur || 0; }
 function _vrte(x)   { return x.vrteTotal || x.vrte || 0; }
 function _qtdMils(x){
   if (typeof x.nmils === 'number') return x.nmils;
   if (Array.isArray(x.militares)) return x.militares.length;
-  // fallback: conta militares de todos os turnos
   if (Array.isArray(x.turnos)) {
     var t = 0;
     x.turnos.forEach(function(tn){ t += (tn.mils || []).length; });
@@ -30,12 +24,37 @@ function _isCancelada(x) {
   return x && (x.cancelada === true || x.status === 'cancelada');
 }
 
+// ⭐ Calcula saldo real do histórico (ignora o campo "saldo" que pode estar errado)
+function calcularSaldoVRTE() {
+  var v = APP.vrte || {};
+  var hist = v.hist || v.historico || [];
+  var saldo = 0;
+  hist.forEach(function(mov) {
+    var qtd = parseFloat(mov.qtd) || 0;
+    if (mov.tipo === 'entrada')      saldo += qtd;
+    else if (mov.tipo === 'saida')   saldo -= qtd;
+  });
+  return saldo;
+}
+
+// Totais separados (entradas e saídas)
+function totalEntradas() {
+  var hist = (APP.vrte && (APP.vrte.hist || APP.vrte.historico)) || [];
+  return hist.filter(function(m){ return m.tipo === 'entrada'; })
+             .reduce(function(s, m){ return s + (parseFloat(m.qtd) || 0); }, 0);
+}
+
+function totalSaidas() {
+  var hist = (APP.vrte && (APP.vrte.hist || APP.vrte.historico)) || [];
+  return hist.filter(function(m){ return m.tipo === 'saida'; })
+             .reduce(function(s, m){ return s + (parseFloat(m.qtd) || 0); }, 0);
+}
+
 function rPainel() {
-  var v = APP.vrte || { saldo: 0, hist: [] };
   var todasEscs = APP.escs || [];
   var mils = APP.mils || [];
 
-  // ⭐ Filtra escalas canceladas do consumo
+  // Filtra escalas canceladas
   var e = todasEscs.filter(function(x) { return !_isCancelada(x); });
 
   var hoje = new Date();
@@ -48,13 +67,11 @@ function rPainel() {
     return new Date(x.data);
   }
 
-  // Escalas do mês atual
   var em = e.filter(function(x) {
     var d = dataDe(x);
     return d && d.getMonth() === mesAtual && d.getFullYear() === anoAtual;
   });
 
-  // Escalas do mês anterior
   var emAnt = e.filter(function(x) {
     var d = dataDe(x);
     if (!d) return false;
@@ -63,19 +80,18 @@ function rPainel() {
     return d.getMonth() === ma && d.getFullYear() === aa;
   });
 
-  // VRTE consumido no mês
   var vrteM = em.reduce(function(s, x) { return s + _vrte(x); }, 0);
-  var saldo = typeof v.saldo === 'number' ? v.saldo : 0;
+
+  // ⭐ SALDO REAL = entradas - saídas do histórico
+  var saldo = calcularSaldoVRTE();
   var vrtePrev = (saldo > 0 && vrteM > 0) ? Math.round(saldo / vrteM) : 0;
 
-  // Verde / vermelha
   var verdes    = em.filter(function(x) { return tipoEscala(x.data) === 'verde'; }).length;
   var vermelhas = em.filter(function(x) { return tipoEscala(x.data) === 'vermelha'; }).length;
 
-  // Ranking de militares no mês
+  // Ranking militares
   var contagem = {};
   em.forEach(function(escala) {
-    // Suporta tanto turnos[].mils quanto militares[]
     var todosMilsEscala = [];
     if (Array.isArray(escala.turnos)) {
       escala.turnos.forEach(function(t) {
@@ -84,7 +100,6 @@ function rPainel() {
     } else if (Array.isArray(escala.militares)) {
       todosMilsEscala = escala.militares;
     }
-
     todosMilsEscala.forEach(function(m) {
       var rg = m.rg || m.nf || 'sem-id';
       if (!contagem[rg]) {
@@ -97,16 +112,13 @@ function rPainel() {
       contagem[rg].cnt++;
     });
   });
-  var ranking = Object.values(contagem)
-    .sort(function(a, b) { return b.cnt - a.cnt; })
-    .slice(0, 5);
+  var ranking = Object.values(contagem).sort(function(a, b) { return b.cnt - a.cnt; }).slice(0, 5);
 
   // Alertas
   var alertas = [];
   if (saldo < 500)        alertas.push({ tipo: 'danger', msg: 'Saldo VRTE crítico: ' + saldo.toLocaleString('pt-BR') + ' VRTE' });
   else if (saldo < 2000)  alertas.push({ tipo: 'warn',   msg: 'Saldo VRTE baixo: '   + saldo.toLocaleString('pt-BR') + ' VRTE' });
 
-  // Militares sem escalar há 30+ dias
   var hoje30 = new Date(hoje - 30 * 86400000);
   var semEscalar = mils.filter(function(m) {
     if (!m.hist || !m.hist.length) return true;
@@ -117,7 +129,6 @@ function rPainel() {
   }).length;
   if (semEscalar > 0) alertas.push({ tipo: 'info', msg: semEscalar + ' militar(es) sem escala há mais de 30 dias' });
 
-  // VRTE por operação no mês
   var vrteOp = {};
   em.forEach(function(x) {
     var nome = _opNome(x);
@@ -126,7 +137,7 @@ function rPainel() {
 
   var mesNome = hoje.toLocaleString('pt-BR', { month: 'long' });
 
-  // ─── Métricas (cards superiores) ───────────────────────────
+  // ─── Métricas ───
   var dm = document.getElementById('dm');
   if (dm) {
     dm.innerHTML =
@@ -138,7 +149,7 @@ function rPainel() {
       + '<div class="mc"><div class="mcl">Militares</div><div class="mcv">' + mils.length + '</div><div class="mcs2">cadastrados</div></div>';
   }
 
-  // ─── Alertas ───────────────────────────
+  // ─── Alertas ───
   var dAlertas = document.getElementById('d-alertas');
   if (dAlertas) {
     if (alertas.length) {
@@ -152,7 +163,7 @@ function rPainel() {
     }
   }
 
-  // ─── Ranking militares ───────────────────────────
+  // ─── Ranking ───
   var dRanking = document.getElementById('d-ranking');
   if (dRanking) {
     dRanking.innerHTML = ranking.length
@@ -166,7 +177,7 @@ function rPainel() {
       : '<div style="text-align:center;color:var(--t3);padding:16px;font-size:12px">Nenhuma escala no mês</div>';
   }
 
-  // ─── VRTE por operação ───────────────────────────
+  // ─── VRTE por operação ───
   var dOpvrte = document.getElementById('d-opvrte');
   if (dOpvrte) {
     var keys = Object.keys(vrteOp);
@@ -180,7 +191,7 @@ function rPainel() {
       : '<div style="text-align:center;color:var(--t3);padding:16px;font-size:12px">Nenhum dado no mês</div>';
   }
 
-  // ─── Últimas escalas (tabela) ───────────────────────────
+  // ─── Últimas escalas ───
   var dtb = document.getElementById('dtb');
   if (dtb) {
     var ul = e.slice().sort(function(a, b) {
@@ -203,7 +214,7 @@ function rPainel() {
       : '<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:20px">Nenhuma escala ainda.</td></tr>';
   }
 
-  // ─── Mini gráfico de barras (últimos 6 meses) ───────────────────────────
+  // ─── Gráfico de barras ───
   var dBarras = document.getElementById('d-barras');
   if (dBarras) {
     var barData = [];

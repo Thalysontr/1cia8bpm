@@ -933,337 +933,470 @@ function salvarEsc() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// GERAR PDF
+// GERAR PDF — Wrappers
 // ═══════════════════════════════════════════════════════════════
 function gerarPDF() {
   var d = getEscData();
   var erro = validarEsc(d);
   if (erro) { alertaErro(erro); return; }
+  _gerarPDFFromEscala(d);
+}
 
+function gerarDocx() {
+  var d = getEscData();
+  var erro = validarEsc(d);
+  if (erro) { alertaErro(erro); return; }
+  _gerarDocxFromEscala(d);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// _normalizaEscala — converte escala salva pro formato esperado
+// ═══════════════════════════════════════════════════════════════
+function _normalizaEscala(d) {
+  // Se já é do form, tem turnos com horarioPreset/localPreset etc.
+  // Se vem do banco, pode ter só os campos básicos.
+  var n = JSON.parse(JSON.stringify(d));
+  if (!n.turnos || !n.turnos.length) {
+    n.turnos = [{
+      horarioPreset: '__outro__',
+      horarioCustom: 'Não informado',
+      localPreset: '__outro__',
+      localCustom: '—',
+      missao: _MISSAO_PADRAO,
+      mils: n.militares || []
+    }];
+  }
+  if (!n.determinacoes) n.determinacoes = [];
+  return n;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// _gerarPDFFromEscala — Gera PDF fiel ao modelo PMES
+// ═══════════════════════════════════════════════════════════════
+function _gerarPDFFromEscala(d) {
   if (typeof window.jspdf === 'undefined') {
-    alertaErro('Biblioteca jsPDF não carregada.');
+    alert('Biblioteca jsPDF não carregada.');
     return;
   }
+
+  d = _normalizaEscala(d);
 
   try {
     var jsPDF = window.jspdf.jsPDF;
     var doc = new jsPDF({ unit: 'mm', format: 'a4' });
-    var W = 210, M = 14;
-    var diaSem = new Date(d.data + 'T12:00:00').toLocaleDateString('pt-BR', { weekday:'long' }).toUpperCase();
+    var W = 210, H = 297, M = 18;
+    var contentW = W - 2*M;
+    var diaSem = d.data ? new Date(d.data + 'T12:00:00').toLocaleDateString('pt-BR', { weekday:'long' }).toUpperCase() : '';
 
-    function header(y) {
-      // Insere logos se disponíveis (carregadas via logos.js)
+    // ─── HEADER (logos + textos) ───
+    function header() {
+      var hy = 12;
+
+      // Logo PMES esquerda
       try {
         if (typeof LOGO_PMES_B64 !== 'undefined' && LOGO_PMES_B64) {
-          doc.addImage(LOGO_PMES_B64, 'PNG', M, y-2, 18, 23);
+          doc.addImage(LOGO_PMES_B64, 'PNG', M, hy, 18, 23);
         }
-        if (typeof LOGO_8BPM_B64 !== 'undefined' && LOGO_8BPM_B64) {
-          doc.addImage(LOGO_8BPM_B64, 'PNG', W - M - 14, y-2, 14, 23);
-        }
-      } catch (e) {
-        console.warn('Logos não carregadas:', e.message);
-      }
+      } catch (e) { console.warn('Logo PMES:', e); }
 
+      // Logo 8BPM direita
+      try {
+        if (typeof LOGO_8BPM_B64 !== 'undefined' && LOGO_8BPM_B64) {
+          doc.addImage(LOGO_8BPM_B64, 'PNG', W - M - 13, hy, 13, 23);
+        }
+      } catch (e) { console.warn('Logo 8BPM:', e); }
+
+      // Textos centrais
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
-      doc.text('GOVERNO DO ESTADO DO ESPÍRITO SANTO', W/2, y, { align:'center' }); y+=5;
-      doc.text('POLÍCIA MILITAR', W/2, y, { align:'center' }); y+=5;
-      doc.text('OITAVO BATALHÃO', W/2, y, { align:'center' }); y+=5;
-      doc.setFont('helvetica', 'italic'); doc.setFontSize(9);
-      doc.text('"Policial Militar, herói protetor da sociedade"', W/2, y, { align:'center' }); y+=7;
+      doc.text('GOVERNO DO ESTADO DO ESPÍRITO SANTO', W/2, hy+4, { align:'center' });
+      doc.text('POLÍCIA MILITAR', W/2, hy+9, { align:'center' });
+      doc.text('OITAVO BATALHÃO', W/2, hy+14, { align:'center' });
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(9);
+      doc.text('"Policial Militar, herói protetor da sociedade"', W/2, hy+20, { align:'center' });
+
+      return 38; // posição Y após header
+    }
+
+    // ─── FOOTER ───
+    function footer() {
+      var fy = H - 12;
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(80, 80, 80);
+      doc.line(M, fy-2, W-M, fy-2);
+      doc.text('"Polícia Militar, patrimônio do povo capixaba."', W/2, fy+1, { align:'center' });
+      doc.setFontSize(7);
+      doc.text('1ª Cia/8º BPM. Endereço: Praça Sol Poente, s/nº, Esplanada-Colatina ES   CEP: 29702-710', W/2, fy+5, { align:'center' });
+      doc.text('Site: www.pm.es.gov.br – E-mail: cmt1cia.8bpm@pm.es.gov.br', W/2, fy+8, { align:'center' });
+      doc.setTextColor(0, 0, 0);
+    }
+
+    function checkPage(y, neededH) {
+      if (y + (neededH || 30) > H - 20) {
+        footer();
+        doc.addPage();
+        return header();
+      }
       return y;
     }
 
-    function footer() {
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(8);
-      doc.text('"Polícia Militar, patrimônio do povo capixaba."', W/2, 285, { align:'center' });
-      doc.text('1ª Cia/8º BPM. Endereço: Praça Sol Poente, s/nº, Esplanada - Colatina ES', W/2, 289, { align:'center' });
-      doc.text('CEP: 29702-710 – Site: www.pm.es.gov.br – E-mail: cmt1cia.8bpm@pm.es.gov.br', W/2, 293, { align:'center' });
-    }
+    var y = header();
 
-    var y = 15;
-    y = header(y);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
+    // ─── TÍTULO DA OPERAÇÃO (azul claro destacado) ───
     doc.setFillColor(126, 211, 247);
-    doc.rect(M, y-4, W-2*M, 7, 'F');
-    doc.text('ISEO – ' + d.operacao.toUpperCase(), W/2, y+1, { align:'center' });
-    y += 7;
+    doc.rect(M, y, contentW, 8, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(0, 0, 0);
+    doc.text('ISEO – ' + (d.operacao || '').toUpperCase(), W/2, y+5.5, { align:'center' });
+    // Linha do underline
+    doc.setLineWidth(0.4);
+    doc.line(M+2, y+7, W-M-2, y+7);
+    y += 10;
 
+    // Ordem de operação opcional
     if (d.ordemNum) {
-      doc.setFontSize(11);
       doc.setFillColor(255, 245, 157);
-      doc.rect(M, y-2, W-2*M, 6, 'F');
-      doc.text('ORDEM DE OPERAÇÃO Nº ' + d.ordemNum, W/2, y+2, { align:'center' });
+      doc.rect(M+30, y, contentW-60, 6, 'F');
+      doc.setFontSize(11);
+      doc.text('ORDEM DE OPERAÇÃO Nº ' + d.ordemNum, W/2, y+4, { align:'center' });
       y += 8;
-    } else {
-      y += 3;
     }
 
+    // ─── DATA ───
+    y += 2;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.text('DATA: ' + fd(d.data).toUpperCase() + ' (' + diaSem + ')', M, y);
-    y += 6;
-
-    doc.setFillColor(126, 211, 247);
-    doc.rect(M, y-2, W-2*M, 6, 'F');
-    doc.text('MUNICÍPIO DE ' + d.municipio.toUpperCase(), W/2, y+2, { align:'center' });
+    doc.setFontSize(11);
+    var dataStr = (typeof fd === 'function' ? fd(d.data) : d.data || '').toUpperCase();
+    var dataFmt = dataStr.replace(/\//g,' DE ').replace('JAN','JANEIRO').replace('FEV','FEVEREIRO')
+      .replace('MAR','MARÇO').replace('ABR','ABRIL').replace('MAI','MAIO').replace('JUN','JUNHO')
+      .replace('JUL','JULHO').replace('AGO','AGOSTO').replace('SET','SETEMBRO')
+      .replace('OUT','OUTUBRO').replace('NOV','NOVEMBRO').replace('DEZ','DEZEMBRO');
+    // Fallback simples — apenas exibe formato dd/mm/aaaa
+    if (d.data && /^\d{4}-\d{2}-\d{2}$/.test(d.data)) {
+      var dt = new Date(d.data + 'T12:00:00');
+      var meses = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
+      dataFmt = dt.getDate() + ' DE ' + meses[dt.getMonth()] + ' DE ' + dt.getFullYear();
+    }
+    doc.text('DATA: ' + dataFmt + (diaSem ? ' (' + diaSem + ')' : ''), M, y+4);
     y += 8;
 
-    d.turnos.forEach(function(t) {
+    // ─── MUNICÍPIO ───
+    doc.setFillColor(126, 211, 247);
+    doc.rect(M, y, contentW, 7, 'F');
+    doc.setFontSize(12);
+    doc.text('MUNICÍPIO DE ' + (d.municipio || '').toUpperCase(), W/2, y+4.8, { align:'center' });
+    y += 9;
+
+    // ─── TURNOS (cada turno = bloco com missão + horário + tabela) ───
+    d.turnos.forEach(function(t, ti) {
+      y = checkPage(y, 50);
+
+      // 1) Missão (caixa simples com borda)
+      doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
+      var missao = t.missao || _MISSAO_PADRAO;
+      var lines = doc.splitTextToSize(missao, contentW - 6);
+      var mh = lines.length * 4 + 3;
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.3);
+      doc.rect(M, y, contentW, mh);
+      doc.text(lines, W/2, y+4, { align:'center' });
+      y += mh;
+
+      // 2) Horário (faixa amarela)
       doc.setFillColor(255, 245, 157);
-      doc.rect(M, y-2, W-2*M, 5, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.text(_localLabel(t), W/2, y+1.5, { align:'center' });
-      y += 5;
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
-      var lines = doc.splitTextToSize(t.missao || _MISSAO_PADRAO, W - 2*M - 4);
-      var hh = lines.length * 4 + 1;
-      doc.rect(M, y-2, W-2*M, hh);
-      doc.text(lines, W/2, y+2, { align:'center' });
-      y += hh - 1;
-
-      doc.setFillColor(255, 245, 157);
-      doc.rect(M, y-2, W-2*M, 5, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.text('Horário da escala: ' + _horarioLabel(t), W/2, y+1.5, { align:'center' });
-      y += 5;
-
-      doc.setFillColor(230, 230, 230);
-      var cols = [12, 28, 65, 23, 23, 31];
-      var x = M;
-      var headers = ['Ordem', 'Posto/Grad.', 'Nome Completo', 'RG', 'NF', 'Função'];
-      doc.rect(M, y-2, W-2*M, 5, 'F');
-      doc.setFontSize(8);
-      headers.forEach(function(h, i) {
-        doc.text(h, x + cols[i]/2, y+1.5, { align:'center' });
-        x += cols[i];
-      });
-      y += 5;
-
-      doc.setFont('helvetica', 'normal');
-      (t.mils || []).forEach(function(m, mi) {
-        x = M;
-        var row = [(mi+1)+'.', m.posto || '', m.nome || '', m.rg || '', m.nf || '', m.funcao || ''];
-        var maxL = 1;
-        row.forEach(function(c, i) {
-          var ll = doc.splitTextToSize(String(c), cols[i]-2);
-          if (ll.length > maxL) maxL = ll.length;
-        });
-        var rowH = Math.max(5, maxL * 4);
-        doc.rect(M, y-2, W-2*M, rowH);
-        x = M;
-        row.forEach(function(c, i) {
-          var ll = doc.splitTextToSize(String(c), cols[i]-2);
-          doc.text(ll, x + cols[i]/2, y+1.5, { align:'center' });
-          x += cols[i];
-        });
-        x = M;
-        cols.forEach(function(cw) {
-          x += cw;
-          doc.line(x, y-2, x, y-2+rowH);
-        });
-        y += rowH;
-      });
-      y += 3;
-
-      if (y > 250) { footer(); doc.addPage(); y = 15; y = header(y); }
-    });
-
-    if (d.determinacoes.length) {
-      y += 3;
+      doc.rect(M, y, contentW, 6, 'FD');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
-      d.determinacoes.forEach(function(det) {
-        if (y > 270) { footer(); doc.addPage(); y = 15; y = header(y); }
-        doc.setFillColor(255, 245, 157);
-        var titW = doc.getTextWidth(det.titulo + ':');
-        doc.rect(M, y-3, titW+2, 5, 'F');
-        doc.text(det.titulo + ':', M+1, y);
-        y += 5;
+      doc.text('Horário da escala: ' + _horarioLabel(t), W/2, y+4, { align:'center' });
+      y += 6;
+
+      // 3) Tabela de militares
+      // Larguras das colunas: Ordem, Posto, Nome, RG, NF, Função
+      var totalW = contentW;
+      var colW = [16, 32, 56, 22, 24, 24]; // soma = 174
+      // Ajusta proporcional pra contentW (174)
+      var soma = colW.reduce(function(a,b){ return a+b; }, 0);
+      colW = colW.map(function(c) { return (c/soma) * totalW; });
+
+      var headers = ['Ordem', 'Posto/Grad.', 'Nome Completo', 'RG', 'NF', 'Função'];
+
+      // Cabeçalho
+      doc.setFillColor(245, 245, 245);
+      doc.rect(M, y, contentW, 6, 'FD');
+      doc.setFontSize(9);
+      var x = M;
+      headers.forEach(function(h, i) {
+        doc.text(h, x + colW[i]/2, y+4, { align:'center' });
+        if (i > 0) doc.line(x, y, x, y+6);
+        x += colW[i];
+      });
+      y += 6;
+
+      // Linhas de militares
+      doc.setFont('helvetica', 'normal');
+      var mils = t.mils || [];
+      if (!mils.length) {
+        doc.rect(M, y, contentW, 6);
+        doc.setTextColor(150, 150, 150);
+        doc.setFont('helvetica', 'italic');
+        doc.text('(Sem militares neste turno)', W/2, y+4, { align:'center' });
+        doc.setTextColor(0, 0, 0);
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        var lines = doc.splitTextToSize('• ' + det.texto, W - 2*M - 4);
-        doc.text(lines, M + 4, y);
-        y += lines.length * 4 + 4;
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
+        y += 6;
+      } else {
+        mils.forEach(function(m, mi) {
+          y = checkPage(y, 8);
+          // Calcula altura da linha (nome pode quebrar)
+          var nomeLines = doc.splitTextToSize(m.nome || '', colW[2] - 2);
+          var rowH = Math.max(6, nomeLines.length * 4 + 2);
+
+          doc.rect(M, y, contentW, rowH);
+
+          var cells = [
+            String(mi + 1) + '.',
+            m.posto || '',
+            null, // será o nome com formatação
+            m.rg || '',
+            m.nf || '',
+            m.funcao || ''
+          ];
+
+          x = M;
+          cells.forEach(function(c, i) {
+            if (i > 0) doc.line(x, y, x, y+rowH);
+            if (i === 2) {
+              // nome - já calculado
+              doc.text(nomeLines, x + colW[i]/2, y + 4, { align:'center' });
+            } else {
+              var lns = doc.splitTextToSize(String(c), colW[i] - 1);
+              doc.text(lns, x + colW[i]/2, y + (rowH/2) + 1, { align:'center' });
+            }
+            x += colW[i];
+          });
+          y += rowH;
+        });
+      }
+
+      y += 4; // espaço entre turnos
+    });
+
+    // ─── DETERMINAÇÕES ───
+    if (d.determinacoes && d.determinacoes.length) {
+      y = checkPage(y, 25);
+      y += 2;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setFillColor(255, 245, 157);
+      var titW = doc.getTextWidth('DETERMINAÇÃO:') + 4;
+      doc.rect(M, y-1, titW, 6, 'F');
+      doc.text('DETERMINAÇÃO:', M+2, y+3.5);
+      // Sublinha
+      doc.line(M+2, y+4.5, M+titW-2, y+4.5);
+      y += 7;
+
+      d.determinacoes.forEach(function(det) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9.5);
+        var lines = doc.splitTextToSize('• ' + det.texto, contentW - 4);
+        var lh = lines.length * 4.2 + 3;
+        y = checkPage(y, lh);
+        doc.text(lines, M + 2, y+3);
+        y += lh;
       });
     }
 
-    if (y > 250) { footer(); doc.addPage(); y = 15; y = header(y); }
+    // ─── ASSINATURA ───
+    y = checkPage(y, 30);
     y += 8;
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     var dataAssin = new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
     doc.text('Colatina-ES, ' + dataAssin + '.', W/2, y, { align:'center' });
     y += 14;
 
-    if (d.assinante.nome) {
+    if (d.assinante && d.assinante.nome) {
       doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
       doc.text(d.assinante.nome, W/2, y, { align:'center' });
       y += 5;
       doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
       var lin2 = (d.assinante.rg || '') + (d.assinante.cargo ? ' - ' + d.assinante.cargo : '');
       doc.text(lin2, W/2, y, { align:'center' });
     }
 
     footer();
 
+    // ═══════════════════ ANEXO ROTAS ═══════════════════
     if (d.inclRotas) {
       doc.addPage();
-      var ay = 15;
-      ay = header(ay);
+      var ay = header();
 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
-      doc.setFillColor(101, 217, 110);
-      doc.rect(M, ay-3, W-2*M, 6, 'F');
-      doc.text('ÁREA DE ATUAÇÃO: 1ª CIA/8º BPM – Colatina/Marilândia – ES', W/2, ay+1, { align:'center' });
-      ay += 8;
+      doc.setFillColor(180, 240, 180);
+      doc.rect(M, ay, contentW, 7, 'F');
+      doc.text('ÁREA DE ATUAÇÃO: 1ª CIA/8º BPM – Colatina/Marilândia – ES', W/2, ay+4.5, { align:'center' });
+      ay += 9;
 
       doc.setFontSize(10);
-      doc.text('Realização de Patrulhamento e Visitas Tranquilizadoras.', W/2, ay, { align:'center' });
-      ay += 6;
+      doc.setFont('helvetica', 'normal');
+      doc.text('Realização de Patrulhamento e Visitas Tranquilizadoras.', W/2, ay+3, { align:'center' });
+      ay += 7;
 
+      // Lado Sul
       doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
       doc.setFillColor(255, 245, 157);
-      doc.rect(M, ay-3, 30, 5, 'F');
-      doc.text('LADO SUL', M+15, ay+0.5, { align:'center' });
-      ay += 5;
+      doc.rect(M, ay, 32, 5, 'F');
+      doc.text('LADO SUL', M+16, ay+3.5, { align:'center' });
+      ay += 6;
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
       _ROTAS_PADRAO.ladoSul.forEach(function(r) {
-        var lines = doc.splitTextToSize(r, W - 2*M - 4);
-        doc.text(lines, M+2, ay);
+        var lines = doc.splitTextToSize(r, contentW - 4);
+        ay = checkPage(ay, lines.length * 4 + 2);
+        doc.text(lines, M+2, ay+3);
         ay += lines.length * 4 + 1;
       });
+      ay += 3;
 
-      ay += 2;
+      // Lado Norte
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setFillColor(255, 245, 157);
-      doc.rect(M, ay-3, 32, 5, 'F');
-      doc.text('LADO NORTE', M+16, ay+0.5, { align:'center' });
-      ay += 5;
+      doc.rect(M, ay, 32, 5, 'F');
+      doc.text('LADO NORTE', M+16, ay+3.5, { align:'center' });
+      ay += 6;
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
       _ROTAS_PADRAO.ladoNorte.forEach(function(r) {
-        var lines = doc.splitTextToSize(r, W - 2*M - 4);
-        doc.text(lines, M+2, ay);
+        var lines = doc.splitTextToSize(r, contentW - 4);
+        ay = checkPage(ay, lines.length * 4 + 2);
+        doc.text(lines, M+2, ay+3);
         ay += lines.length * 4 + 1;
-        if (ay > 270) { footer(); doc.addPage(); ay = 15; ay = header(ay); }
       });
 
       ay += 3;
-      if (ay > 240) { footer(); doc.addPage(); ay = 15; ay = header(ay); }
+      ay = checkPage(ay, 30);
+
+      // Anexo 01
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
       doc.setFillColor(126, 211, 247);
-      doc.rect(M, ay-3, W-2*M, 6, 'F');
-      doc.text('ANEXO 01: SUGESTÃO DE VISITAS TRANQUILIZADORAS – MARILÂNDIA', W/2, ay+1, { align:'center' });
-      ay += 7;
+      doc.rect(M, ay, contentW, 7, 'F');
+      doc.text('ANEXO 01: SUGESTÃO DE VISITAS TRANQUILIZADORAS – MARILÂNDIA', W/2, ay+4.5, { align:'center' });
+      ay += 9;
 
-      var ac = [50, 35, 97];
+      var ac = [55, 35, contentW-90];
       doc.setFontSize(9);
       doc.setFillColor(255, 245, 157);
-      doc.rect(M, ay-3, W-2*M, 5, 'F');
+      doc.rect(M, ay, contentW, 5, 'FD');
+      var xx = M;
       ['Nome do Proprietário', 'Contato', 'Endereço'].forEach(function(h, i) {
-        var x = M;
-        for (var k = 0; k < i; k++) x += ac[k];
-        doc.text(h, x + ac[i]/2, ay+0.5, { align:'center' });
+        doc.text(h, xx + ac[i]/2, ay+3.5, { align:'center' });
+        if (i > 0) doc.line(xx, ay, xx, ay+5);
+        xx += ac[i];
       });
       ay += 5;
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       _ANEXO_VISITAS.forEach(function(v) {
-        if (ay > 275) { footer(); doc.addPage(); ay = 15; ay = header(ay); }
         var nl = doc.splitTextToSize(v[0], ac[0]-2);
         var cl = doc.splitTextToSize(v[1], ac[1]-2);
         var el = doc.splitTextToSize(v[2], ac[2]-2);
         var rh = Math.max(nl.length, cl.length, el.length) * 3.5 + 2;
-        doc.rect(M, ay-2, W-2*M, rh);
+        ay = checkPage(ay, rh);
+
+        doc.rect(M, ay, contentW, rh);
         var x = M;
-        doc.text(nl, x+1, ay+1); x += ac[0]; doc.line(x, ay-2, x, ay-2+rh);
-        doc.text(cl, x+1, ay+1); x += ac[1]; doc.line(x, ay-2, x, ay-2+rh);
-        doc.text(el, x+1, ay+1);
+        doc.text(nl, x+1, ay+3); x += ac[0]; doc.line(x, ay, x, ay+rh);
+        doc.text(cl, x+1, ay+3); x += ac[1]; doc.line(x, ay, x, ay+rh);
+        doc.text(el, x+1, ay+3);
         ay += rh;
       });
 
       ay += 8;
-      if (ay > 250) { footer(); doc.addPage(); ay = 15; ay = header(ay); }
+      ay = checkPage(ay, 30);
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
+      doc.setFontSize(11);
       doc.text('Colatina-ES, ' + dataAssin + '.', W/2, ay, { align:'center' });
       ay += 14;
-      if (d.assinante.nome) {
+      if (d.assinante && d.assinante.nome) {
         doc.setFont('helvetica', 'bold');
         doc.text(d.assinante.nome, W/2, ay, { align:'center' });
         ay += 5;
         doc.setFont('helvetica', 'normal');
-        var lin2b = (d.assinante.rg || '') + (d.assinante.cargo ? ' - ' + d.assinante.cargo : '');
-        doc.text(lin2b, W/2, ay, { align:'center' });
+        doc.setFontSize(10);
+        doc.text((d.assinante.rg || '') + (d.assinante.cargo ? ' - ' + d.assinante.cargo : ''), W/2, ay, { align:'center' });
       }
       footer();
     }
 
-    var nomeArq = 'Escala_ISEO_Dia_' + d.data.split('-').reverse().join('-') + '_-_1ª_Cia-8º_BPM_-_' + (d.operacao || 'op').replace(/[^\w]/g, '_') + '.pdf';
+    var dataArq = (d.data || '').split('-').reverse().join('-');
+    var nomeArq = 'Escala_ISEO_Dia_' + dataArq + '_-_1ª_Cia-8º_BPM_-_' +
+                  (d.operacao || 'op').replace(/[^\w]/g, '_') +
+                  (d.duracao ? '_-_' + d.duracao + '_hrs' : '') + '.pdf';
     doc.save(nomeArq);
 
   } catch (err) {
     console.error('Erro ao gerar PDF:', err);
-    alertaErro('Erro ao gerar PDF: ' + err.message);
+    alert('Erro ao gerar PDF: ' + err.message);
   }
 }
 
 // ═══════════════════════════════════════════════════════════════
-// GERAR DOCX
+// _gerarDocxFromEscala
 // ═══════════════════════════════════════════════════════════════
-function gerarDocx() {
-  var d = getEscData();
-  var erro = validarEsc(d);
-  if (erro) { alertaErro(erro); return; }
-
+function _gerarDocxFromEscala(d) {
   if (typeof docx === 'undefined') {
-    alertaErro('Biblioteca docx não carregada.');
+    alert('Biblioteca docx não carregada.');
     return;
   }
+
+  d = _normalizaEscala(d);
 
   try {
     var Document = docx.Document, Packer = docx.Packer, Paragraph = docx.Paragraph,
         TextRun = docx.TextRun, AlignmentType = docx.AlignmentType,
         Table = docx.Table, TableRow = docx.TableRow, TableCell = docx.TableCell,
-        WidthType = docx.WidthType, ImageRun = docx.ImageRun;
+        WidthType = docx.WidthType, ImageRun = docx.ImageRun,
+        BorderStyle = docx.BorderStyle, ShadingType = docx.ShadingType;
 
     var children = [];
-    var diaSem = new Date(d.data + 'T12:00:00').toLocaleDateString('pt-BR', { weekday:'long' }).toUpperCase();
+    var diaSem = d.data ? new Date(d.data + 'T12:00:00').toLocaleDateString('pt-BR', { weekday:'long' }).toUpperCase() : '';
 
-    // Insere logos lado a lado com o cabeçalho de texto (usando tabela invisível)
+    var noBorder = {
+      top:    { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      left:   { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      right:  { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
+    };
+
     var temLogos = (typeof LOGO_PMES_B64 !== 'undefined' && LOGO_PMES_B64 &&
                     typeof LOGO_8BPM_B64 !== 'undefined' && LOGO_8BPM_B64);
 
+    function _b64ToBytes(b64str) {
+      var raw = b64str.split(',')[1] || b64str;
+      var bin = atob(raw);
+      var arr = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      return arr;
+    }
+
+    // Cabeçalho com logos em tabela invisível
     if (temLogos && ImageRun) {
       try {
-        // Converte base64 → Uint8Array (jspdf aceita data:image, mas docx precisa de bytes)
-        function _b64ToBytes(b64str) {
-          var raw = b64str.split(',')[1] || b64str;
-          var bin = atob(raw);
-          var arr = new Uint8Array(bin.length);
-          for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-          return arr;
-        }
         var pmesBytes = _b64ToBytes(LOGO_PMES_B64);
         var bpmBytes  = _b64ToBytes(LOGO_8BPM_B64);
 
-        // Tabela 3 colunas: logo PMES | textos centralizados | logo 8BPM
         var headerTextos = [
           new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'GOVERNO DO ESTADO DO ESPÍRITO SANTO', bold:true, size:22 })] }),
           new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'POLÍCIA MILITAR', bold:true, size:22 })] }),
@@ -1271,35 +1404,27 @@ function gerarDocx() {
           new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'"Policial Militar, herói protetor da sociedade"', italics:true, size:18 })] })
         ];
 
-        var headerRow = new TableRow({
-          children: [
-            new TableCell({
-              children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: pmesBytes, transformation: { width: 60, height: 75 } })] })],
-              borders: { top:{style:'none'}, bottom:{style:'none'}, left:{style:'none'}, right:{style:'none'} }
-            }),
-            new TableCell({
-              children: headerTextos,
-              borders: { top:{style:'none'}, bottom:{style:'none'}, left:{style:'none'}, right:{style:'none'} }
-            }),
-            new TableCell({
-              children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: bpmBytes, transformation: { width: 50, height: 75 } })] })],
-              borders: { top:{style:'none'}, bottom:{style:'none'}, left:{style:'none'}, right:{style:'none'} }
-            })
-          ]
-        });
-
         children.push(new Table({
           width: { size: 100, type: WidthType.PERCENTAGE },
-          rows: [headerRow]
+          rows: [new TableRow({
+            children: [
+              new TableCell({
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: pmesBytes, transformation: { width: 60, height: 75 } })] })],
+                borders: noBorder, width: { size: 18, type: WidthType.PERCENTAGE }
+              }),
+              new TableCell({
+                children: headerTextos,
+                borders: noBorder, width: { size: 64, type: WidthType.PERCENTAGE }
+              }),
+              new TableCell({
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: bpmBytes, transformation: { width: 50, height: 75 } })] })],
+                borders: noBorder, width: { size: 18, type: WidthType.PERCENTAGE }
+              })
+            ]
+          })]
         }));
-        children.push(new Paragraph({ text:'' }));
       } catch (e) {
-        console.warn('Erro ao inserir logos no DOCX:', e);
-        // Fallback: sem logos
-        children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'GOVERNO DO ESTADO DO ESPÍRITO SANTO', bold:true, size:22 })] }));
-        children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'POLÍCIA MILITAR', bold:true, size:22 })] }));
-        children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'OITAVO BATALHÃO', bold:true, size:22 })] }));
-        children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'"Policial Militar, herói protetor da sociedade"', italics:true, size:18 })] }));
+        console.warn('Erro logos DOCX:', e);
       }
     } else {
       children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'GOVERNO DO ESTADO DO ESPÍRITO SANTO', bold:true, size:22 })] }));
@@ -1309,26 +1434,61 @@ function gerarDocx() {
     }
     children.push(new Paragraph({ text:'' }));
 
-    children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'ISEO – ' + d.operacao.toUpperCase(), bold:true, size:26, underline: {} })] }));
+    // Título azul
+    children.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      shading: { type: ShadingType.SOLID, color: '7ED3F7', fill: '7ED3F7' },
+      children: [new TextRun({ text:'ISEO – ' + (d.operacao||'').toUpperCase(), bold:true, size:28, underline: {} })]
+    }));
     if (d.ordemNum) {
-      children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'ORDEM DE OPERAÇÃO Nº ' + d.ordemNum, bold:true, size:22, underline: {} })] }));
+      children.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        shading: { type: ShadingType.SOLID, color: 'FFF59D', fill: 'FFF59D' },
+        children: [new TextRun({ text:'ORDEM DE OPERAÇÃO Nº ' + d.ordemNum, bold:true, size:22, underline: {} })]
+      }));
     }
     children.push(new Paragraph({ text:'' }));
 
-    children.push(new Paragraph({ children: [new TextRun({ text:'DATA: ', bold:true }), new TextRun(fd(d.data).toUpperCase() + ' (' + diaSem + ')')] }));
-    children.push(new Paragraph({ text:'' }));
-    children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'MUNICÍPIO DE ' + d.municipio.toUpperCase(), bold:true, size:22 })] }));
+    // Data
+    var dataStr = '';
+    if (d.data && /^\d{4}-\d{2}-\d{2}$/.test(d.data)) {
+      var dt = new Date(d.data + 'T12:00:00');
+      var meses = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
+      dataStr = dt.getDate() + ' DE ' + meses[dt.getMonth()] + ' DE ' + dt.getFullYear();
+    }
+    children.push(new Paragraph({
+      children: [new TextRun({ text:'DATA: ', bold:true }), new TextRun(dataStr + (diaSem ? ' (' + diaSem + ')' : ''))]
+    }));
+
+    // Município
+    children.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      shading: { type: ShadingType.SOLID, color: '7ED3F7', fill: '7ED3F7' },
+      children: [new TextRun({ text:'MUNICÍPIO DE ' + (d.municipio||'').toUpperCase(), bold:true, size:22 })]
+    }));
     children.push(new Paragraph({ text:'' }));
 
+    // Turnos
     d.turnos.forEach(function(t) {
-      children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: _localLabel(t), bold:true, size:22 })] }));
-      children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: t.missao || _MISSAO_PADRAO, italics:true })] }));
-      children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Horário da escala: ' + _horarioLabel(t), bold:true })] }));
+      // Missão (caixa centralizada)
+      children.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: t.missao || _MISSAO_PADRAO, italics:true, size:20 })]
+      }));
+      // Horário (faixa amarela)
+      children.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        shading: { type: ShadingType.SOLID, color: 'FFF59D', fill: 'FFF59D' },
+        children: [new TextRun({ text: 'Horário da escala: ' + _horarioLabel(t), bold:true, size:22 })]
+      }));
 
       var headers = ['Ordem', 'Posto/Grad.', 'Nome Completo', 'RG', 'NF', 'Função'];
       var headerRow = new TableRow({
         children: headers.map(function(h) {
-          return new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:h, bold:true })] })] });
+          return new TableCell({
+            shading: { type: ShadingType.SOLID, color: 'F0F0F0', fill: 'F0F0F0' },
+            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:h, bold:true })] })]
+          });
         })
       });
       var milRows = (t.mils || []).map(function(m, mi) {
@@ -1340,44 +1500,69 @@ function gerarDocx() {
         });
       });
       if (!milRows.length) {
-        milRows.push(new TableRow({ children: [new TableCell({ children:[new Paragraph('Sem militares')], columnSpan:6 })] }));
+        milRows.push(new TableRow({ children: [new TableCell({ children:[new Paragraph({ alignment: AlignmentType.CENTER, children:[new TextRun({ text:'(Sem militares)', italics:true })] })], columnSpan:6 })] }));
       }
       children.push(new Table({ width:{ size:100, type:WidthType.PERCENTAGE }, rows:[headerRow].concat(milRows) }));
       children.push(new Paragraph({ text:'' }));
     });
 
-    d.determinacoes.forEach(function(det) {
-      children.push(new Paragraph({ children: [new TextRun({ text: det.titulo + ':', bold:true, underline:{} })] }));
-      children.push(new Paragraph({ children: [new TextRun('• ' + det.texto)] }));
+    // Determinações
+    if (d.determinacoes && d.determinacoes.length) {
+      children.push(new Paragraph({
+        children: [new TextRun({ text:'DETERMINAÇÃO:', bold:true, underline:{},
+          shading: { type: ShadingType.SOLID, color: 'FFF59D', fill: 'FFF59D' } })]
+      }));
+      d.determinacoes.forEach(function(det) {
+        children.push(new Paragraph({ children: [new TextRun('• ' + det.texto)] }));
+      });
       children.push(new Paragraph({ text:'' }));
-    });
+    }
 
     children.push(new Paragraph({ text:'' }));
     var dataAss = new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
     children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun('Colatina-ES, ' + dataAss + '.')] }));
     children.push(new Paragraph({ text:'' }));
     children.push(new Paragraph({ text:'' }));
-    if (d.assinante.nome) {
-      children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: d.assinante.nome, bold:true })] }));
+    if (d.assinante && d.assinante.nome) {
+      children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: d.assinante.nome, bold:true, size:22 })] }));
       var lin2 = (d.assinante.rg||'') + (d.assinante.cargo ? ' - ' + d.assinante.cargo : '');
       children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(lin2)] }));
     }
 
+    // Anexo
     if (d.inclRotas) {
-      children.push(new Paragraph({ pageBreakBefore: true, alignment: AlignmentType.CENTER, children: [new TextRun({ text:'ÁREA DE ATUAÇÃO: 1ª CIA/8º BPM – Colatina/Marilândia – ES', bold:true })] }));
+      children.push(new Paragraph({
+        pageBreakBefore: true,
+        alignment: AlignmentType.CENTER,
+        shading: { type: ShadingType.SOLID, color: 'B4F0B4', fill: 'B4F0B4' },
+        children: [new TextRun({ text:'ÁREA DE ATUAÇÃO: 1ª CIA/8º BPM – Colatina/Marilândia – ES', bold:true })]
+      }));
       children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun('Realização de Patrulhamento e Visitas Tranquilizadoras.')] }));
       children.push(new Paragraph({ text:'' }));
-      children.push(new Paragraph({ children: [new TextRun({ text:'LADO SUL', bold:true })] }));
+      children.push(new Paragraph({
+        shading: { type: ShadingType.SOLID, color: 'FFF59D', fill: 'FFF59D' },
+        children: [new TextRun({ text:'LADO SUL', bold:true })]
+      }));
       _ROTAS_PADRAO.ladoSul.forEach(function(r) { children.push(new Paragraph(r)); });
       children.push(new Paragraph({ text:'' }));
-      children.push(new Paragraph({ children: [new TextRun({ text:'LADO NORTE', bold:true })] }));
+      children.push(new Paragraph({
+        shading: { type: ShadingType.SOLID, color: 'FFF59D', fill: 'FFF59D' },
+        children: [new TextRun({ text:'LADO NORTE', bold:true })]
+      }));
       _ROTAS_PADRAO.ladoNorte.forEach(function(r) { children.push(new Paragraph(r)); });
 
       children.push(new Paragraph({ text:'' }));
-      children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'ANEXO 01: SUGESTÃO DE VISITAS TRANQUILIZADORAS – MARILÂNDIA', bold:true })] }));
+      children.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        shading: { type: ShadingType.SOLID, color: '7ED3F7', fill: '7ED3F7' },
+        children: [new TextRun({ text:'ANEXO 01: SUGESTÃO DE VISITAS TRANQUILIZADORAS – MARILÂNDIA', bold:true })]
+      }));
 
       var hr = new TableRow({ children: ['Nome do Proprietário', 'Contato', 'Endereço'].map(function(h) {
-        return new TableCell({ children: [new Paragraph({ children: [new TextRun({ text:h, bold:true })] })] });
+        return new TableCell({
+          shading: { type: ShadingType.SOLID, color: 'FFF59D', fill: 'FFF59D' },
+          children: [new Paragraph({ children: [new TextRun({ text:h, bold:true })] })]
+        });
       }) });
       var rows = _ANEXO_VISITAS.map(function(v) {
         return new TableRow({ children: v.map(function(c) {
@@ -1391,14 +1576,17 @@ function gerarDocx() {
     Packer.toBlob(docDoc).then(function(blob) {
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
+      var dataArq = (d.data || '').split('-').reverse().join('-');
       a.href = url;
-      a.download = 'Escala_ISEO_Dia_' + d.data.split('-').reverse().join('-') + '_-_1ª_Cia-8º_BPM_-_' + (d.operacao || 'op').replace(/[^\w]/g, '_') + '.docx';
+      a.download = 'Escala_ISEO_Dia_' + dataArq + '_-_1ª_Cia-8º_BPM_-_' +
+                   (d.operacao || 'op').replace(/[^\w]/g, '_') +
+                   (d.duracao ? '_-_' + d.duracao + '_hrs' : '') + '.docx';
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
     });
   } catch (err) {
     console.error('Erro DOCX:', err);
-    alertaErro('Erro ao gerar DOCX: ' + err.message);
+    alert('Erro ao gerar DOCX: ' + err.message);
   }
 }
 
