@@ -101,6 +101,100 @@ var _turnos = [];
 var _determinacoes = JSON.parse(JSON.stringify(_DETERMINACOES_PADRAO));
 
 // ═══════════════════════════════════════════════════════════════
+// HELPERS DE FORMATAÇÃO — fidedignos ao modelo PMES
+// ═══════════════════════════════════════════════════════════════
+
+// Lista de partículas que NUNCA são consideradas "sobrenome"
+var _PARTICULAS_NOME = ['da','de','do','das','dos','e','di','du','del','della','la','le','van','von'];
+
+// Identifica o "sobrenome de família" no estilo do modelo PMES.
+// Regras observadas no PDF modelo (ordem de prioridade):
+//
+//   "Edson Marcos da Costa"          → "Costa"      (após partícula → última)
+//   "Jorge Luis Sarcinelli Santos"   → "Sarcinelli" (4 palavras, sem partícula → 3ª)
+//   "Júlio Cezar Gama"               → "Gama"       (3 palavras → última)
+//   "Thiago Bastos Marques"          → "Marques"    (3 palavras → última)
+//   "Eduardo Nardi Ferrari"          → "Ferrari"    (3 palavras → última)
+//   "João Hilton da Conceição Gomes" → "Hilton"     (2ª antes da partícula)
+//
+// Regra consolidada:
+//   1) Se tem partícula no meio do nome:
+//      - Se a partícula vem ANTES da última palavra (ex: "da Costa") → última
+//      - Se a partícula vem DEPOIS da 2ª palavra (ex: "Hilton da...") → 2ª
+//   2) Sem partícula:
+//      - 3 palavras → última (3ª)
+//      - 4+ palavras → 3ª palavra (sobrenome de família, deixando "Santos"/"Júnior" etc. fora)
+//      - 2 palavras → última
+function _splitNomeNegrito(nomeCompleto) {
+  var nome = (nomeCompleto || '').trim();
+  if (!nome) return { antes: '', negrito: '', depois: '' };
+
+  var partes = nome.split(/\s+/);
+  if (partes.length <= 1) return { antes: '', negrito: nome, depois: '' };
+  if (partes.length === 2) return { antes: partes[0] + ' ', negrito: partes[1], depois: '' };
+
+  // Localiza partículas
+  var idxsParticula = [];
+  for (var k = 0; k < partes.length; k++) {
+    if (_PARTICULAS_NOME.indexOf(partes[k].toLowerCase()) !== -1) idxsParticula.push(k);
+  }
+
+  var idx; // posição da palavra que será destacada
+  if (idxsParticula.length > 0) {
+    var primPart = idxsParticula[0];
+    var ultimoIdx = partes.length - 1;
+    // Se a partícula vem IMEDIATAMENTE antes da última palavra
+    // (ex: "Edson Marcos da Costa", "Carlos da Silva Pereira" — não, este tem 2 sem partícula depois)
+    // Refinando: se há APENAS 1 palavra após a partícula → destaca essa última
+    if (primPart === ultimoIdx - 1) {
+      idx = ultimoIdx; // "...da Costa" → Costa
+    } else if (primPart >= 2) {
+      // "Hilton da Conceição Gomes" → palavra ANTES da partícula
+      idx = primPart - 1;
+    } else {
+      // partícula em posição 0 ou 1 → última
+      idx = ultimoIdx;
+    }
+  } else {
+    // Sem partículas
+    if (partes.length === 3) {
+      idx = 2; // última
+    } else {
+      // 4+ palavras sem partícula: 3ª palavra é o sobrenome de família
+      // (ex: "Jorge Luis Sarcinelli Santos" → Sarcinelli)
+      idx = 2;
+    }
+  }
+
+  var antes = idx > 0 ? partes.slice(0, idx).join(' ') + ' ' : '';
+  var negrito = partes[idx];
+  var depois = idx < partes.length - 1 ? ' ' + partes.slice(idx + 1).join(' ') : '';
+
+  return { antes: antes, negrito: negrito, depois: depois };
+}
+
+// Formata data ISO (yyyy-mm-dd) → "20 DE ABRIL DE 2026"
+function _fmtDataExtenso(iso) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '';
+  var dt = new Date(iso + 'T12:00:00');
+  var meses = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO',
+               'JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
+  return dt.getDate() + ' DE ' + meses[dt.getMonth()] + ' DE ' + dt.getFullYear();
+}
+
+// Formata data ISO → "20 de abril de 2026" (para linha de assinatura)
+function _fmtDataAssinatura(iso) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    // Fallback: data atual
+    return new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
+  }
+  var dt = new Date(iso + 'T12:00:00');
+  var meses = ['janeiro','fevereiro','março','abril','maio','junho',
+               'julho','agosto','setembro','outubro','novembro','dezembro'];
+  return dt.getDate() + ' de ' + meses[dt.getMonth()] + ' de ' + dt.getFullYear();
+}
+
+// ═══════════════════════════════════════════════════════════════
 // HELPERS — verifica se operação é "Colheita"
 // ═══════════════════════════════════════════════════════════════
 function _isOperacaoColheita() {
@@ -973,6 +1067,183 @@ function _normalizaEscala(d) {
 // ═══════════════════════════════════════════════════════════════
 // _gerarPDFFromEscala — Gera PDF fiel ao modelo PMES
 // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// _renderDetTextoDestacado — renderiza UMA determinação no PDF
+// reproduzindo os destaques visuais do modelo PMES:
+//   • destaque AMARELO (highlight): nome da operação, prazo crítico
+//   • sublinhado AZUL: referências/links (URLs, "1ª Cia/8º BPM")
+//   • bullet "•" no início
+// Padrões reconhecidos automaticamente:
+//   - "FORÇA E PRESENÇA", "FORÇA TOTAL", "OPERAÇÃO COLHEITA" → amarelo+negrito
+//   - "IMPRETERIVELMENTE ATÉ ÀS HH:MM ... ESCALA." → amarelo+negrito
+//   - URLs (https?://...) → azul sublinhado
+//   - "1ª Cia/8º BPM:" / "1ª CIA/8º BPM:" / "E-Docs" → azul sublinhado
+//   - "Gerar PDF do relatório..." (até ":") → azul sublinhado
+//
+// Como jsPDF não tem rich-text nativo, segmentamos o texto em RUNS
+// e renderizamos run-a-run controlando posição X manualmente.
+// ═══════════════════════════════════════════════════════════════
+
+function _segmentarTextoDet(texto) {
+  // Padrões e seus estilos. Ordem importa: padrões mais específicos primeiro.
+  var padroes = [
+    // Prazo (frase inteira em destaque amarelo)
+    { re: /IMPRETERIVELMENTE ATÉ ÀS \d{1,2}:\d{2} HORAS DO 1º DIA ÚTIL SUBSEQUENTE A ESCALA\.?/g, estilo: 'amarelo' },
+    // Nomes de operação destacados
+    { re: /FORÇA E PRESENÇA/g, estilo: 'amarelo' },
+    { re: /FORÇA TOTAL/g,      estilo: 'amarelo' },
+    { re: /OPERAÇÃO COLHEITA/g, estilo: 'amarelo' },
+    // Referências/links
+    { re: /https?:\/\/\S+/g,   estilo: 'azul' },
+    { re: /1ª\s*CIA\/8º\s*BPM[:.]?/gi, estilo: 'azul' },
+    { re: /E-Docs/g,           estilo: 'azul' },
+    { re: /SIGEO\s*ANÁLISE/gi, estilo: 'azul' },
+    // Frase de instrução típica do modelo
+    { re: /Gerar PDF do relatório e encaminhar via E-Docs para:\s*1ª\s*Cia\/8º\s*BPM:?/gi, estilo: 'azul' }
+  ];
+
+  // Coleta todos os matches com posições
+  var marcas = [];
+  padroes.forEach(function(p) {
+    var m;
+    p.re.lastIndex = 0;
+    while ((m = p.re.exec(texto)) !== null) {
+      marcas.push({ ini: m.index, fim: m.index + m[0].length, texto: m[0], estilo: p.estilo });
+      if (m[0].length === 0) break;
+    }
+  });
+
+  // Ordena por posição e remove sobreposições (o primeiro encontrado vence)
+  marcas.sort(function(a, b) { return a.ini - b.ini; });
+  var limpa = [];
+  var ultFim = -1;
+  marcas.forEach(function(m) {
+    if (m.ini >= ultFim) { limpa.push(m); ultFim = m.fim; }
+  });
+
+  // Constrói a sequência de runs (texto normal + destacados intercalados)
+  var runs = [];
+  var pos = 0;
+  limpa.forEach(function(m) {
+    if (m.ini > pos) runs.push({ texto: texto.slice(pos, m.ini), estilo: 'normal' });
+    runs.push({ texto: m.texto, estilo: m.estilo });
+    pos = m.fim;
+  });
+  if (pos < texto.length) runs.push({ texto: texto.slice(pos), estilo: 'normal' });
+
+  return runs;
+}
+
+// Renderiza os runs com word-wrap. Chama callback com o novo Y.
+function _renderDetTextoDestacado(doc, texto, M, contentW, y, cb) {
+  var runs = _segmentarTextoDet('• ' + texto);
+
+  // Desmonta cada run em palavras+espaços, mantendo o estilo
+  var tokens = [];
+  runs.forEach(function(r) {
+    // Quebra preservando espaços
+    var partes = r.texto.split(/(\s+)/);
+    partes.forEach(function(p) {
+      if (p) tokens.push({ texto: p, estilo: r.estilo });
+    });
+  });
+
+  var x = M + 2;
+  var maxX = M + contentW - 2;
+  var lh = 4.2;
+  var startY = y + 3;
+  var curY = startY;
+
+  function aplicaEstilo(estilo) {
+    if (estilo === 'amarelo') {
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+    } else if (estilo === 'azul') {
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 64, 192);
+    } else {
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 0, 0);
+    }
+  }
+
+  function drawHighlight(estilo, xIni, xFim, baseY) {
+    if (estilo === 'amarelo') {
+      doc.setFillColor(255, 245, 100);
+      // Highlight retangular atrás do texto (altura ~3.5mm)
+      doc.rect(xIni - 0.3, baseY - 3, (xFim - xIni) + 0.6, 4, 'F');
+    } else if (estilo === 'azul') {
+      // Sublinhado azul fino
+      doc.setDrawColor(0, 64, 192);
+      doc.setLineWidth(0.25);
+      doc.line(xIni, baseY + 0.6, xFim, baseY + 0.6);
+      doc.setDrawColor(0, 0, 0);
+    }
+  }
+
+  // Para destaques, primeiro desenhamos o background/highlight, depois o texto.
+  // Como o wrap é dinâmico, fazemos em duas passadas por linha:
+  //   1) calcula posições dos tokens da linha
+  //   2) desenha highlights → desenha texto
+
+  // Reduzimos o algoritmo: vamos quebrar em LINHAS primeiro,
+  // depois renderizar cada linha completa.
+
+  var linhas = [[]];
+  var larguraAtual = 0;
+  tokens.forEach(function(tok) {
+    aplicaEstilo(tok.estilo);
+    var w = doc.getTextWidth(tok.texto);
+    // Se for espaço puro no início de linha, ignora
+    if (/^\s+$/.test(tok.texto) && larguraAtual === 0) return;
+    if (larguraAtual + w > (contentW - 4) && larguraAtual > 0) {
+      // quebra de linha
+      linhas.push([]);
+      larguraAtual = 0;
+      if (/^\s+$/.test(tok.texto)) return;
+    }
+    linhas[linhas.length - 1].push({ texto: tok.texto, estilo: tok.estilo, w: w });
+    larguraAtual += w;
+  });
+  doc.setTextColor(0, 0, 0);
+
+  // Verifica se cabe na página, senão quebra
+  var alturaTotal = linhas.length * lh + 3;
+  // Função checkPage está no escopo externo — usamos via window se preciso.
+  // Como cb apenas atualiza Y, deixamos o caller verificar.
+
+  // Desenha
+  linhas.forEach(function(linha, li) {
+    var baseY = startY + li * lh;
+    var cursorX = M + 2;
+    // 1ª passada — highlights
+    var cx = cursorX;
+    linha.forEach(function(tok) {
+      if (tok.estilo === 'amarelo') {
+        drawHighlight('amarelo', cx, cx + tok.w, baseY);
+      }
+      cx += tok.w;
+    });
+    // 2ª passada — texto + sublinhados
+    cx = cursorX;
+    linha.forEach(function(tok) {
+      aplicaEstilo(tok.estilo);
+      doc.text(tok.texto, cx, baseY);
+      if (tok.estilo === 'azul' && !/^\s+$/.test(tok.texto)) {
+        drawHighlight('azul', cx, cx + tok.w, baseY);
+      }
+      cx += tok.w;
+    });
+  });
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(0, 0, 0);
+
+  cb(y + alturaTotal);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// _gerarPDFFromEscala — Gera PDF fiel ao modelo PMES
+// ═══════════════════════════════════════════════════════════════
 function _gerarPDFFromEscala(d) {
   if (typeof window.jspdf === 'undefined') {
     alert('Biblioteca jsPDF não carregada.');
@@ -1044,16 +1315,21 @@ function _gerarPDFFromEscala(d) {
 
     var y = header();
 
-    // ─── TÍTULO DA OPERAÇÃO (azul claro destacado) ───
+    // ─── TÍTULO DA OPERAÇÃO (faixa azul + texto VERMELHO sublinhado) ───
     doc.setFillColor(126, 211, 247);
     doc.rect(M, y, contentW, 8, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
+    doc.setTextColor(192, 0, 0); // VERMELHO PMES (igual modelo)
+    var tituloOp = 'ISEO – ' + (d.operacao || '').toUpperCase();
+    doc.text(tituloOp, W/2, y+5.5, { align:'center' });
+    // Sublinhado vermelho sob o texto
+    var titW = doc.getTextWidth(tituloOp);
+    doc.setDrawColor(192, 0, 0);
+    doc.setLineWidth(0.5);
+    doc.line(W/2 - titW/2, y+6.8, W/2 + titW/2, y+6.8);
     doc.setTextColor(0, 0, 0);
-    doc.text('ISEO – ' + (d.operacao || '').toUpperCase(), W/2, y+5.5, { align:'center' });
-    // Linha do underline
-    doc.setLineWidth(0.4);
-    doc.line(M+2, y+7, W-M-2, y+7);
+    doc.setDrawColor(0, 0, 0);
     y += 10;
 
     // Ordem de operação opcional
@@ -1069,17 +1345,8 @@ function _gerarPDFFromEscala(d) {
     y += 2;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
-    var dataStr = (typeof fd === 'function' ? fd(d.data) : d.data || '').toUpperCase();
-    var dataFmt = dataStr.replace(/\//g,' DE ').replace('JAN','JANEIRO').replace('FEV','FEVEREIRO')
-      .replace('MAR','MARÇO').replace('ABR','ABRIL').replace('MAI','MAIO').replace('JUN','JUNHO')
-      .replace('JUL','JULHO').replace('AGO','AGOSTO').replace('SET','SETEMBRO')
-      .replace('OUT','OUTUBRO').replace('NOV','NOVEMBRO').replace('DEZ','DEZEMBRO');
-    // Fallback simples — apenas exibe formato dd/mm/aaaa
-    if (d.data && /^\d{4}-\d{2}-\d{2}$/.test(d.data)) {
-      var dt = new Date(d.data + 'T12:00:00');
-      var meses = ['JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
-      dataFmt = dt.getDate() + ' DE ' + meses[dt.getMonth()] + ' DE ' + dt.getFullYear();
-    }
+    var dataFmt = _fmtDataExtenso(d.data);
+    if (!dataFmt && d.data) dataFmt = d.data; // fallback
     doc.text('DATA: ' + dataFmt + (diaSem ? ' (' + diaSem + ')' : ''), M, y+4);
     y += 8;
 
@@ -1115,10 +1382,10 @@ function _gerarPDFFromEscala(d) {
       y += 6;
 
       // 3) Tabela de militares
-      // Larguras das colunas: Ordem, Posto, Nome, RG, NF, Função
+      // Larguras conforme PDF modelo PMES (proporção observada):
+      // Ordem(estreita), Posto/Grad.(média), Nome Completo(maior), RG, NF, Função
       var totalW = contentW;
-      var colW = [16, 32, 56, 22, 24, 24]; // soma = 174
-      // Ajusta proporcional pra contentW (174)
+      var colW = [14, 30, 60, 22, 24, 24]; // soma = 174
       var soma = colW.reduce(function(a,b){ return a+b; }, 0);
       colW = colW.map(function(c) { return (c/soma) * totalW; });
 
@@ -1150,16 +1417,39 @@ function _gerarPDFFromEscala(d) {
       } else {
         mils.forEach(function(m, mi) {
           y = checkPage(y, 8);
-          // Calcula altura da linha (nome pode quebrar)
-          var nomeLines = doc.splitTextToSize(m.nome || '', colW[2] - 2);
-          var rowH = Math.max(6, nomeLines.length * 4 + 2);
 
+          // ── Nome com sobrenome em NEGRITO (fidedigno ao modelo PMES) ──
+          var nomePartes = _splitNomeNegrito(m.nome || '');
+          // Calcula largura do nome completo no font atual pra centralizar bem
+          doc.setFont('helvetica', 'normal');
+          var wAntes = doc.getTextWidth(nomePartes.antes);
+          doc.setFont('helvetica', 'bold');
+          var wNeg = doc.getTextWidth(nomePartes.negrito);
+          doc.setFont('helvetica', 'normal');
+          var wDepois = doc.getTextWidth(nomePartes.depois);
+          var wTotal = wAntes + wNeg + wDepois;
+
+          // Se couber em uma linha, renderiza com runs separados
+          var colNomeW = colW[2];
+          var nomeLines;
+          var nomeMultilinha = false;
+          if (wTotal <= colNomeW - 2) {
+            nomeLines = [nomePartes];
+            nomeMultilinha = false;
+          } else {
+            // Não cabe — fallback: split normal e mantém só o sobrenome em negrito
+            // dividindo-o numa run separada
+            nomeLines = doc.splitTextToSize(m.nome || '', colNomeW - 2);
+            nomeMultilinha = true;
+          }
+
+          var rowH = Math.max(6, (nomeMultilinha ? nomeLines.length : 1) * 4 + 2);
           doc.rect(M, y, contentW, rowH);
 
           var cells = [
             String(mi + 1) + '.',
             m.posto || '',
-            null, // será o nome com formatação
+            null, // o nome é renderizado separadamente
             m.rg || '',
             m.nf || '',
             m.funcao || ''
@@ -1169,9 +1459,24 @@ function _gerarPDFFromEscala(d) {
           cells.forEach(function(c, i) {
             if (i > 0) doc.line(x, y, x, y+rowH);
             if (i === 2) {
-              // nome - já calculado
-              doc.text(nomeLines, x + colW[i]/2, y + 4, { align:'center' });
+              // ── Coluna "Nome Completo" — renderização especial ──
+              if (!nomeMultilinha) {
+                // Linha única: três runs (antes / NEGRITO / depois) centralizados
+                var startX = x + (colW[i] - wTotal) / 2;
+                var ty = y + (rowH/2) + 1;
+                doc.setFont('helvetica', 'normal');
+                doc.text(nomePartes.antes, startX, ty);
+                doc.setFont('helvetica', 'bold');
+                doc.text(nomePartes.negrito, startX + wAntes, ty);
+                doc.setFont('helvetica', 'normal');
+                doc.text(nomePartes.depois, startX + wAntes + wNeg, ty);
+              } else {
+                // Multilinha: renderiza linhas normais sem destaque (caso raro)
+                doc.setFont('helvetica', 'normal');
+                doc.text(nomeLines, x + colW[i]/2, y + 4, { align:'center' });
+              }
             } else {
+              doc.setFont('helvetica', 'normal');
               var lns = doc.splitTextToSize(String(c), colW[i] - 1);
               doc.text(lns, x + colW[i]/2, y + (rowH/2) + 1, { align:'center' });
             }
@@ -1201,11 +1506,13 @@ function _gerarPDFFromEscala(d) {
       d.determinacoes.forEach(function(det) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9.5);
-        var lines = doc.splitTextToSize('• ' + det.texto, contentW - 4);
-        var lh = lines.length * 4.2 + 3;
-        y = checkPage(y, lh);
-        doc.text(lines, M + 2, y+3);
-        y += lh;
+        // Estima altura: ~ceil(len/90) linhas * 4.2 + 3
+        var estLinhas = Math.ceil((det.texto.length + 4) / 90);
+        var estH = estLinhas * 4.2 + 5;
+        y = checkPage(y, estH);
+        _renderDetTextoDestacado(doc, det.texto, M, contentW, y, function(novoY) {
+          y = novoY;
+        });
       });
     }
 
@@ -1214,7 +1521,8 @@ function _gerarPDFFromEscala(d) {
     y += 8;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
-    var dataAssin = new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
+    // Usa a DATA DA ESCALA (não a data atual) — fidedigno ao modelo
+    var dataAssin = _fmtDataAssinatura(d.data);
     doc.text('Colatina-ES, ' + dataAssin + '.', W/2, y, { align:'center' });
     y += 14;
 
@@ -1434,11 +1742,16 @@ function _gerarDocxFromEscala(d) {
     }
     children.push(new Paragraph({ text:'' }));
 
-    // Título azul
+    // Título azul com texto VERMELHO sublinhado (igual modelo PMES)
     children.push(new Paragraph({
       alignment: AlignmentType.CENTER,
       shading: { type: ShadingType.SOLID, color: '7ED3F7', fill: '7ED3F7' },
-      children: [new TextRun({ text:'ISEO – ' + (d.operacao||'').toUpperCase(), bold:true, size:28, underline: {} })]
+      children: [new TextRun({
+        text:'ISEO – ' + (d.operacao||'').toUpperCase(),
+        bold:true, size:28,
+        color: 'C00000', // VERMELHO PMES
+        underline: { color: 'C00000' }
+      })]
     }));
     if (d.ordemNum) {
       children.push(new Paragraph({
@@ -1492,12 +1805,23 @@ function _gerarDocxFromEscala(d) {
         })
       });
       var milRows = (t.mils || []).map(function(m, mi) {
-        var row = [(mi+1)+'.', m.posto||'', m.nome||'', m.rg||'', m.nf||'', m.funcao||''];
-        return new TableRow({
-          children: row.map(function(c) {
-            return new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(String(c))] })] });
-          })
-        });
+        // Nome com sobrenome em NEGRITO (3 runs)
+        var np = _splitNomeNegrito(m.nome || '');
+        var nomeRuns = [];
+        if (np.antes)   nomeRuns.push(new TextRun(np.antes));
+        if (np.negrito) nomeRuns.push(new TextRun({ text: np.negrito, bold: true }));
+        if (np.depois)  nomeRuns.push(new TextRun(np.depois));
+        if (!nomeRuns.length) nomeRuns.push(new TextRun(m.nome || ''));
+
+        var celulas = [
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(String((mi+1)+'.'))] })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(String(m.posto||''))] })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: nomeRuns })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(String(m.rg||''))] })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(String(m.nf||''))] })] }),
+          new TableCell({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(String(m.funcao||''))] })] })
+        ];
+        return new TableRow({ children: celulas });
       });
       if (!milRows.length) {
         milRows.push(new TableRow({ children: [new TableCell({ children:[new Paragraph({ alignment: AlignmentType.CENTER, children:[new TextRun({ text:'(Sem militares)', italics:true })] })], columnSpan:6 })] }));
@@ -1513,13 +1837,31 @@ function _gerarDocxFromEscala(d) {
           shading: { type: ShadingType.SOLID, color: 'FFF59D', fill: 'FFF59D' } })]
       }));
       d.determinacoes.forEach(function(det) {
-        children.push(new Paragraph({ children: [new TextRun('• ' + det.texto)] }));
+        // Segmenta o texto e cria runs com destaques (amarelo/azul) iguais ao PDF
+        var segs = _segmentarTextoDet('• ' + det.texto);
+        var runs = segs.map(function(s) {
+          if (s.estilo === 'amarelo') {
+            return new TextRun({
+              text: s.texto, bold: true,
+              shading: { type: ShadingType.SOLID, color: 'FFF564', fill: 'FFF564' }
+            });
+          } else if (s.estilo === 'azul') {
+            return new TextRun({
+              text: s.texto,
+              color: '0040C0',
+              underline: { color: '0040C0' }
+            });
+          }
+          return new TextRun(s.texto);
+        });
+        children.push(new Paragraph({ children: runs }));
       });
       children.push(new Paragraph({ text:'' }));
     }
 
     children.push(new Paragraph({ text:'' }));
-    var dataAss = new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
+    // Data da assinatura = DATA DA ESCALA (fidedigno ao modelo)
+    var dataAss = _fmtDataAssinatura(d.data);
     children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun('Colatina-ES, ' + dataAss + '.')] }));
     children.push(new Paragraph({ text:'' }));
     children.push(new Paragraph({ text:'' }));
