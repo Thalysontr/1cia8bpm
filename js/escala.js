@@ -840,7 +840,7 @@ function salvarEsc() {
   }
 
   var saldo = ((APP.vrte || {}).saldo) || 0;
-  if (d.tipo === 'vermelha' && d.vrteTotal > saldo) {
+  if (d.vrteTotal > saldo) {
     if (!confirm('⚠️ VRTE necessário (' + d.vrteTotal + ') é maior que o saldo atual (' + saldo + ').\n\nContinuar mesmo assim?')) return;
   }
 
@@ -883,7 +883,7 @@ function salvarEsc() {
     DB.saveEsc(escala, function(resultado) {
       console.log('[salvarEsc] DB.saveEsc retornou:', resultado);
 
-      if (d.tipo === 'vermelha' && d.vrteTotal > 0 && typeof DB.saveVrte === 'function') {
+      if (d.vrteTotal > 0 && typeof DB.saveVrte === 'function') {
         var v = APP.vrte || { saldo: 0, hist: [] };
         var novoSaldo = (v.saldo || 0) - d.vrteTotal;
         var hist = (v.hist || v.historico || []).slice();
