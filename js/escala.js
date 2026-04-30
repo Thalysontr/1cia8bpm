@@ -1060,7 +1060,12 @@ function _normalizaEscala(d) {
       mils: n.militares || []
     }];
   }
-  if (!n.determinacoes) n.determinacoes = [];
+  // Se não tem determinações, usa a SIGEO padrão (fidedigno ao modelo PMES)
+  if (!n.determinacoes || !n.determinacoes.length) {
+    n.determinacoes = _DETERMINACOES_PADRAO
+      .filter(function(det) { return det.incluir && !det.soColheita; })
+      .map(function(det) { return JSON.parse(JSON.stringify(det)); });
+  }
   return n;
 }
 
@@ -1771,16 +1776,19 @@ function _gerarDocxFromEscalaImpl(d, docxLib) {
           rows: [new TableRow({
             children: [
               new TableCell({
-                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: pmesBytes, transformation: { width: 60, height: 75 } })] })],
-                borders: noBorder, width: { size: 18, type: WidthType.PERCENTAGE }
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: pmesBytes, transformation: { width: 50, height: 65 } })] })],
+                borders: noBorder, width: { size: 13, type: WidthType.PERCENTAGE },
+                verticalAlign: VerticalAlign ? VerticalAlign.CENTER : undefined
               }),
               new TableCell({
                 children: headerTextos,
-                borders: noBorder, width: { size: 64, type: WidthType.PERCENTAGE }
+                borders: noBorder, width: { size: 74, type: WidthType.PERCENTAGE },
+                verticalAlign: VerticalAlign ? VerticalAlign.CENTER : undefined
               }),
               new TableCell({
-                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: bpmBytes, transformation: { width: 50, height: 75 } })] })],
-                borders: noBorder, width: { size: 18, type: WidthType.PERCENTAGE }
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: bpmBytes, transformation: { width: 42, height: 65 } })] })],
+                borders: noBorder, width: { size: 13, type: WidthType.PERCENTAGE },
+                verticalAlign: VerticalAlign ? VerticalAlign.CENTER : undefined
               })
             ]
           })]
@@ -1998,7 +2006,14 @@ function _gerarDocxFromEscalaImpl(d, docxLib) {
       children.push(new Table({ width:{ size:100, type:WidthType.PERCENTAGE }, rows:[hr].concat(rows) }));
     }
 
-    var docDoc = new Document({ sections: [{ properties:{}, children:children }] });
+    var docDoc = new Document({
+      styles: {
+        default: {
+          document: { run: { font: 'Arial', size: 20 } } // 10pt em todo o documento
+        }
+      },
+      sections: [{ properties: {}, children: children }]
+    });
     Packer.toBlob(docDoc).then(function(blob) {
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
