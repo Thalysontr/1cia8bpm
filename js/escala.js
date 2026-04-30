@@ -1385,9 +1385,9 @@ function _gerarPDFFromEscala(d) {
 
       // 3) Tabela de militares
       // Larguras conforme PDF modelo PMES (proporção observada):
-      // Ordem(estreita), Posto/Grad.(média), Nome Completo(maior), RG, NF, Função
+      // Ordem(estreita), Posto/Grad.(média), Nome Completo(maior), RG, NF, Função(maior pra caber "Cmt da Operação")
       var totalW = contentW;
-      var colW = [14, 30, 60, 22, 24, 24]; // soma = 174
+      var colW = [12, 28, 56, 22, 22, 34]; // soma = 174 — Função aumentada
       var soma = colW.reduce(function(a,b){ return a+b; }, 0);
       colW = colW.map(function(c) { return (c/soma) * totalW; });
 
@@ -1418,11 +1418,11 @@ function _gerarPDFFromEscala(d) {
         y += 6;
       } else {
         mils.forEach(function(m, mi) {
-          y = checkPage(y, 8);
+          y = checkPage(y, 10);
+          doc.setFontSize(9);
 
           // ── Nome com sobrenome em NEGRITO (fidedigno ao modelo PMES) ──
           var nomePartes = _splitNomeNegrito(m.nome || '');
-          // Calcula largura do nome completo no font atual pra centralizar bem
           doc.setFont('helvetica', 'normal');
           var wAntes = doc.getTextWidth(nomePartes.antes);
           doc.setFont('helvetica', 'bold');
@@ -1431,22 +1431,11 @@ function _gerarPDFFromEscala(d) {
           var wDepois = doc.getTextWidth(nomePartes.depois);
           var wTotal = wAntes + wNeg + wDepois;
 
-          // Se couber em uma linha, renderiza com runs separados
           var colNomeW = colW[2];
-          var nomeLines;
-          var nomeMultilinha = false;
-          if (wTotal <= colNomeW - 2) {
-            nomeLines = [nomePartes];
-            nomeMultilinha = false;
-          } else {
-            // Não cabe — fallback: split normal e mantém só o sobrenome em negrito
-            // dividindo-o numa run separada
-            nomeLines = doc.splitTextToSize(m.nome || '', colNomeW - 2);
-            nomeMultilinha = true;
-          }
-
-          var rowH = Math.max(6, (nomeMultilinha ? nomeLines.length : 1) * 4 + 2);
-          doc.rect(M, y, contentW, rowH);
+          var nomeMultilinha = wTotal > colNomeW - 2;
+          var nomeLines = nomeMultilinha
+            ? doc.splitTextToSize(m.nome || '', colNomeW - 2)
+            : 1;
 
           contadorMilPdf++;
           var cells = [
@@ -1458,11 +1447,24 @@ function _gerarPDFFromEscala(d) {
             m.funcao || ''
           ];
 
+          // ── Calcula altura da linha considerando quebra em TODAS as colunas ──
+          var maxLinhas = nomeMultilinha ? nomeLines.length : 1;
+          for (var ci = 0; ci < cells.length; ci++) {
+            if (ci === 2 || cells[ci] == null) continue;
+            doc.setFont('helvetica', ci === 0 ? 'bold' : 'normal');
+            var splitL = doc.splitTextToSize(String(cells[ci]), colW[ci] - 1.5);
+            if (splitL.length > maxLinhas) maxLinhas = splitL.length;
+          }
+          var rowH = Math.max(6, maxLinhas * 4 + 2);
+
+          // Borda externa da linha
+          doc.rect(M, y, contentW, rowH);
+
           x = M;
           cells.forEach(function(c, i) {
-            if (i > 0) doc.line(x, y, x, y+rowH);
+            if (i > 0) doc.line(x, y, x, y+rowH); // linhas verticais até embaixo
             if (i === 2) {
-              // ── Coluna "Nome Completo" — renderização especial ──
+              // ── Coluna "Nome Completo" — renderização especial com negrito ──
               if (!nomeMultilinha) {
                 // Linha única: três runs (antes / NEGRITO / depois) centralizados
                 var startX = x + (colW[i] - wTotal) / 2;
@@ -1474,15 +1476,17 @@ function _gerarPDFFromEscala(d) {
                 doc.setFont('helvetica', 'normal');
                 doc.text(nomePartes.depois, startX + wAntes + wNeg, ty);
               } else {
-                // Multilinha: renderiza linhas normais sem destaque (caso raro)
+                // Multilinha: renderiza centralizado verticalmente
                 doc.setFont('helvetica', 'normal');
-                doc.text(nomeLines, x + colW[i]/2, y + 4, { align:'center' });
+                var startY = y + (rowH - nomeLines.length * 4) / 2 + 3;
+                doc.text(nomeLines, x + colW[i]/2, startY, { align:'center' });
               }
             } else {
-              // Coluna Ordem (i=0) em negrito, demais em normal
+              // Demais colunas — quebra texto se necessário
               doc.setFont('helvetica', i === 0 ? 'bold' : 'normal');
-              var lns = doc.splitTextToSize(String(c), colW[i] - 1);
-              doc.text(lns, x + colW[i]/2, y + (rowH/2) + 1, { align:'center' });
+              var lns = doc.splitTextToSize(String(c), colW[i] - 1.5);
+              var startY2 = y + (rowH - lns.length * 4) / 2 + 3;
+              doc.text(lns, x + colW[i]/2, startY2, { align:'center' });
             }
             x += colW[i];
           });
