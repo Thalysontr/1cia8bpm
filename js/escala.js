@@ -952,6 +952,18 @@ function gerarPDF() {
     var diaSem = new Date(d.data + 'T12:00:00').toLocaleDateString('pt-BR', { weekday:'long' }).toUpperCase();
 
     function header(y) {
+      // Insere logos se disponíveis (carregadas via logos.js)
+      try {
+        if (typeof LOGO_PMES_B64 !== 'undefined' && LOGO_PMES_B64) {
+          doc.addImage(LOGO_PMES_B64, 'PNG', M, y-2, 18, 23);
+        }
+        if (typeof LOGO_8BPM_B64 !== 'undefined' && LOGO_8BPM_B64) {
+          doc.addImage(LOGO_8BPM_B64, 'PNG', W - M - 14, y-2, 14, 23);
+        }
+      } catch (e) {
+        console.warn('Logos não carregadas:', e.message);
+      }
+
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
       doc.text('GOVERNO DO ESTADO DO ESPÍRITO SANTO', W/2, y, { align:'center' }); y+=5;
@@ -1229,15 +1241,72 @@ function gerarDocx() {
     var Document = docx.Document, Packer = docx.Packer, Paragraph = docx.Paragraph,
         TextRun = docx.TextRun, AlignmentType = docx.AlignmentType,
         Table = docx.Table, TableRow = docx.TableRow, TableCell = docx.TableCell,
-        WidthType = docx.WidthType;
+        WidthType = docx.WidthType, ImageRun = docx.ImageRun;
 
     var children = [];
     var diaSem = new Date(d.data + 'T12:00:00').toLocaleDateString('pt-BR', { weekday:'long' }).toUpperCase();
 
-    children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'GOVERNO DO ESTADO DO ESPÍRITO SANTO', bold:true, size:22 })] }));
-    children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'POLÍCIA MILITAR', bold:true, size:22 })] }));
-    children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'OITAVO BATALHÃO', bold:true, size:22 })] }));
-    children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'"Policial Militar, herói protetor da sociedade"', italics:true, size:18 })] }));
+    // Insere logos lado a lado com o cabeçalho de texto (usando tabela invisível)
+    var temLogos = (typeof LOGO_PMES_B64 !== 'undefined' && LOGO_PMES_B64 &&
+                    typeof LOGO_8BPM_B64 !== 'undefined' && LOGO_8BPM_B64);
+
+    if (temLogos && ImageRun) {
+      try {
+        // Converte base64 → Uint8Array (jspdf aceita data:image, mas docx precisa de bytes)
+        function _b64ToBytes(b64str) {
+          var raw = b64str.split(',')[1] || b64str;
+          var bin = atob(raw);
+          var arr = new Uint8Array(bin.length);
+          for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+          return arr;
+        }
+        var pmesBytes = _b64ToBytes(LOGO_PMES_B64);
+        var bpmBytes  = _b64ToBytes(LOGO_8BPM_B64);
+
+        // Tabela 3 colunas: logo PMES | textos centralizados | logo 8BPM
+        var headerTextos = [
+          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'GOVERNO DO ESTADO DO ESPÍRITO SANTO', bold:true, size:22 })] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'POLÍCIA MILITAR', bold:true, size:22 })] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'OITAVO BATALHÃO', bold:true, size:22 })] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'"Policial Militar, herói protetor da sociedade"', italics:true, size:18 })] })
+        ];
+
+        var headerRow = new TableRow({
+          children: [
+            new TableCell({
+              children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: pmesBytes, transformation: { width: 60, height: 75 } })] })],
+              borders: { top:{style:'none'}, bottom:{style:'none'}, left:{style:'none'}, right:{style:'none'} }
+            }),
+            new TableCell({
+              children: headerTextos,
+              borders: { top:{style:'none'}, bottom:{style:'none'}, left:{style:'none'}, right:{style:'none'} }
+            }),
+            new TableCell({
+              children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: bpmBytes, transformation: { width: 50, height: 75 } })] })],
+              borders: { top:{style:'none'}, bottom:{style:'none'}, left:{style:'none'}, right:{style:'none'} }
+            })
+          ]
+        });
+
+        children.push(new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [headerRow]
+        }));
+        children.push(new Paragraph({ text:'' }));
+      } catch (e) {
+        console.warn('Erro ao inserir logos no DOCX:', e);
+        // Fallback: sem logos
+        children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'GOVERNO DO ESTADO DO ESPÍRITO SANTO', bold:true, size:22 })] }));
+        children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'POLÍCIA MILITAR', bold:true, size:22 })] }));
+        children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'OITAVO BATALHÃO', bold:true, size:22 })] }));
+        children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'"Policial Militar, herói protetor da sociedade"', italics:true, size:18 })] }));
+      }
+    } else {
+      children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'GOVERNO DO ESTADO DO ESPÍRITO SANTO', bold:true, size:22 })] }));
+      children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'POLÍCIA MILITAR', bold:true, size:22 })] }));
+      children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'OITAVO BATALHÃO', bold:true, size:22 })] }));
+      children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'"Policial Militar, herói protetor da sociedade"', italics:true, size:18 })] }));
+    }
     children.push(new Paragraph({ text:'' }));
 
     children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text:'ISEO – ' + d.operacao.toUpperCase(), bold:true, size:26, underline: {} })] }));
