@@ -833,9 +833,9 @@ function salvarEsc() {
   }
 
   // Verifica se DB existe
-  if (typeof DB === 'undefined' || typeof DB.saveEscala !== 'function') {
-    console.error('[salvarEsc] DB.saveEscala não disponível');
-    alertaErro('Erro: DB.saveEscala não está disponível. Recarregue a página.');
+  if (typeof DB === 'undefined' || typeof DB.saveEsc !== 'function') {
+    console.error('[salvarEsc] DB.saveEsc não disponível');
+    alertaErro('Erro: DB.saveEsc não está disponível. Recarregue a página.');
     return;
   }
 
@@ -877,11 +877,11 @@ function salvarEsc() {
     criadaEm:  new Date().toISOString()
   };
 
-  console.log('[salvarEsc] chamando DB.saveEscala com:', escala);
+  console.log('[salvarEsc] chamando DB.saveEsc com:', escala);
 
   try {
-    DB.saveEscala(escala, function(resultado) {
-      console.log('[salvarEsc] DB.saveEscala retornou:', resultado);
+    DB.saveEsc(escala, function(resultado) {
+      console.log('[salvarEsc] DB.saveEsc retornou:', resultado);
 
       if (d.tipo === 'vermelha' && d.vrteTotal > 0 && typeof DB.saveVrte === 'function') {
         var v = APP.vrte || { saldo: 0, hist: [] };
