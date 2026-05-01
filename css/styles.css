@@ -44,11 +44,10 @@ body{font-family:var(--fn);background:var(--bg);color:var(--t);font-size:13px;li
   margin-bottom:24px;
 }
 .lb-logo-mark{
-  width:34px;height:34px;border-radius:8px;
-  background:var(--ac);
-  display:flex;align-items:center;justify-content:center;
-  font-size:15px;font-weight:700;color:#fff;
-  font-family:var(--fn);
+  width:42px;height:42px;
+  object-fit:contain;
+  display:block;
+  flex-shrink:0;
 }
 .lb-logo-text{font-size:16px;font-weight:700;color:var(--t);letter-spacing:-.3px;font-family:var(--fn)}
 .lb-logo-sub{font-size:11px;color:var(--t3);margin-top:1px;white-space:nowrap;font-family:var(--fn)}
@@ -133,8 +132,8 @@ body{font-family:var(--fn);background:var(--bg);color:var(--t);font-size:13px;li
 
 /* topbar */
 .tb{
-  background:#1c3557;
-  border-bottom:1px solid #152843;
+  background:#0f1c2e;
+  border-bottom:1px solid rgba(255,255,255,.06);
   padding:0 20px;
   display:flex;align-items:center;justify-content:space-between;
   height:52px;flex-shrink:0;

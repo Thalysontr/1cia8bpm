@@ -36,20 +36,14 @@
   box-sizing: border-box !important;
 }
 .sb.sb-expanded .sb-header .sb-logo {
-  width: 36px !important;
-  height: 36px !important;
-  border-radius: 8px !important;
-  background: linear-gradient(135deg, #d4a956 0%, #b8862e 100%) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  font-weight: 800 !important;
-  font-size: 14px !important;
-  color: #0f1c2e !important;
+  width: 40px !important;
+  height: 40px !important;
+  object-fit: contain !important;
+  display: block !important;
   flex-shrink: 0 !important;
-  box-shadow: 0 2px 6px rgba(0,0,0,.25) !important;
-  font-family: 'Montserrat', sans-serif !important;
-  letter-spacing: -.5px !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
   margin: 0 !important;
   padding: 0 !important;
 }

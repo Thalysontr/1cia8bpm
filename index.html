@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Sistema ISEO — 1ª Cia / 8º BPM</title>
+<title>Sistema 1ª Cia — 8º BPM</title>
 
 <!-- Fonte: Montserrat -->
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -34,9 +34,9 @@
 <div id="ls">
   <div class="lb">
     <div class="lb-logo">
-      <div class="lb-logo-mark">I</div>
+      <img class="lb-logo-mark" id="lb-logo-img" alt="8º BPM"/>
       <div>
-        <div class="lb-logo-text">ISEO</div>
+        <div class="lb-logo-text">1ª Cia</div>
         <div class="lb-logo-sub">8º BPM · 1ª CIA · ES</div>
       </div>
     </div>
@@ -58,10 +58,10 @@
   <!-- Sidebar (texto + ícones) -->
   <div class="sb sb-expanded">
     <div class="sb-header">
-      <div class="sb-logo">1ª</div>
+      <img class="sb-logo" id="sb-logo-img" alt="8º BPM"/>
       <div class="sb-title">
         <span class="t1">Sistema 1ª Cia</span>
-        <span class="t2">8º BPM · ISEO</span>
+        <span class="t2">8º BPM · Colatina</span>
       </div>
     </div>
 
@@ -472,6 +472,24 @@ var TMPL_B64="UEsDBBQAAAAIAIFdlVzJf3/HuAEAABMJAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbL
 <script src="js/dispensas.js"></script>
 <script src="js/patches.js"></script>
 <script src="js/vrte_painel_patch.js"></script>
+
+<!-- 7. Injeção da logo do 8º BPM (login + sidebar) -->
+<script>
+(function(){
+  function aplicarLogo(){
+    if(typeof LOGO_8BPM === 'undefined') return;
+    var lb = document.getElementById('lb-logo-img');
+    var sb = document.getElementById('sb-logo-img');
+    if(lb) lb.src = LOGO_8BPM;
+    if(sb) sb.src = LOGO_8BPM;
+  }
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', aplicarLogo);
+  } else {
+    aplicarLogo();
+  }
+})();
+</script>
 
 </body>
 </html>
