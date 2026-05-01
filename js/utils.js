@@ -17,3 +17,20 @@ function badgeTipo(dataStr){
 function fd(d){return d?new Date(d+'T12:00:00').toLocaleDateString('pt-BR'):'—';}
 function esc(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function show(id){var el=document.getElementById(id);if(!el)return;el.style.display='block';setTimeout(function(){el.style.display='none';},3000);}
+
+// ─── Sanitização (DOMPurify) ────────────────────────────────────
+// Use setHtml() no lugar de element.innerHTML = html
+function setHtml(el, html) {
+  if (typeof el === 'string') el = document.getElementById(el);
+  if (!el) return;
+  el.innerHTML = (typeof DOMPurify !== 'undefined')
+    ? DOMPurify.sanitize(html, { USE_PROFILES: { html: true } })
+    : html;
+}
+
+// Insere texto puro sem risco de XSS (usa textContent)
+function setText(el, text) {
+  if (typeof el === 'string') el = document.getElementById(el);
+  if (!el) return;
+  el.textContent = text;
+}
