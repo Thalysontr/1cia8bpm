@@ -1,0 +1,22 @@
+# Node / Firebase Functions
+node_modules/
+npm-debug.log
+
+# Dados de seed — podem conter PII, NUNCA commitar
+js/seed_data.js
+
+# Variáveis de ambiente
+.env
+.env.local
+.env.*.local
+
+# Firebase emulator
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/

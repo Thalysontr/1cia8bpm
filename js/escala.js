@@ -67,34 +67,8 @@ var _ROTAS_PADRAO = {
   ]
 };
 
-var _ANEXO_VISITAS = [
-  ['Rafael Caldonho', '27995195461', 'Rua Cônego João Guilherme Marilândia'],
-  ['Saulo Zerboni', '27998247644', 'Córrego da Raiz - Vizinho Luiz Carlos Comério'],
-  ['Artur Dadalto', '27997383308', 'Córrego Seis horas, carlim dadalto, 1km acima da igreja, antes da serra que vira para o córrego novo.'],
-  ['Paulo Antonio Drago', '27988125763', 'Santo Hilário - ao lado da Igreja de Santo Hilário'],
-  ['Edmilson Jose Tozi', '27998932135', 'Corrego Alto Paixao, conhecido como boqueirao.'],
-  ['Wallace Cypriano', '27999737486', 'Córrego taquarussu'],
-  ['Clóvis Antônio Caliman', '27998247637', 'Córrego Novo'],
-  ['Sérgio Altoé', '27998508788', 'Rod. Mário Catelam km 1 em frente ao encaper'],
-  ['Alessandro Bertoldi', '27999763008', 'Córrego Jeremias'],
-  ['Waldemir Bolsanelo', '27997358243', 'Córrego Geremias'],
-  ['Eudesmar Viguini', '27997053620', 'Taquarussu um quilômetro a frente do campo sentido a Patrão Mor'],
-  ['Jovander Comerio', '27999749230', 'Córrego Calado (Patrimônio do Rádio)'],
-  ['Ivan Marcelo Altoé', '27993097831', 'Sítio Bem Te Vi Santo Hilário'],
-  ['Ismael Serafin', '27999341886', 'Corrego Cedro, depois da máquina do Roberto Arrivabene'],
-  ['Wesley Smarzaro', '27998247831', 'Alto Liberdade (por cima da padaria de Alto Liberdade)'],
-  ['Florêncio Baptista Neto', '27999336197', 'Fazenda Baptista. Próximo à igreja Maranata e igreja católica.'],
-  ['Sergiomar Arrivabene', '27998005413', 'Corrego Pastin, subiu a serra do Bravim, entrar a direita até o final'],
-  ['Wellington Feroni', '27999473199', 'Santo Hilário, galpão da Apoio Rural'],
-  ['Vinicius Arrivabene', '27998631291', 'Corrego Novo (próximo a bica do Meniquine)'],
-  ['Aldemir e Carlos Boldrini', '27998291211', 'Patrão Mor (primeira casa Patrão Mor sentido Taquarussu)'],
-  ['Onadir Bada', '27998202365', 'Córrego Alegria, à esquerda, subindo a serra do Lajinha'],
-  ['Jonas Geraldo Ardison', '27999749380', 'Córrego Joaquim Távora ES 360 - última propriedade do córrego'],
-  ['Elio Jose dos Santos', '27999488277', 'Entrada Córrego Calado - saída do calçamento'],
-  ['Higor Loos Altoe', '27997154434', 'Rodovia Mario Catelan, KM01, Zona Rural, Marilândia/ES. Ao lado da fazenda experimental do Incaper.'],
-  ['Luis Rogerio Altoe', '27998184092', 'Rod. Mario Catelan KM01, Zona Rural, Marilândia/ES'],
-  ['Assis Tozzi Milanez', '27992915788', 'Córrego São José (vizinho do Brazilino Altoé)']
-];
+// Carregado do Firestore via DB.getAnexoVisitas() em rNova()
+var _ANEXO_VISITAS = [];
 
 // ─── Estado ──────────────────────────────────────────────────────
 var _turnos = [];
@@ -214,6 +188,8 @@ function _isOperacaoColheita() {
 function rNova() {
   var ed = document.getElementById('ed');
   if (ed && !ed.value) ed.value = new Date().toISOString().split('T')[0];
+
+  DB.getAnexoVisitas(function(list) { _ANEXO_VISITAS = list; });
 
   updSelOp();
   updSelAss();
