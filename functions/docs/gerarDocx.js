@@ -1,5 +1,5 @@
 'use strict';
-const functions = require('firebase-functions');
+const functions = require('firebase-functions/v1');
 const admin     = require('firebase-admin');
 
 // Geração de DOCX server-side (stub — implementação completa na Fase 3.3)

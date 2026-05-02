@@ -1,8 +1,8 @@
 'use strict';
-const functions = require('firebase-functions');
+const functions = require('firebase-functions/v1');
 const admin     = require('firebase-admin');
 
-function makeLog(collection, docId, action) {
+function makeLog(collection) {
   return functions.firestore
     .document(collection + '/{docId}')
     .onWrite(async (change, context) => {
@@ -19,7 +19,7 @@ function makeLog(collection, docId, action) {
     });
 }
 
-exports.logMils     = makeLog('mils',     'mils');
-exports.logOps      = makeLog('ops',      'ops');
-exports.logEscalas  = makeLog('escalas',  'escalas');
-exports.logDisps    = makeLog('dispensas','dispensas');
+exports.logMils     = makeLog('mils');
+exports.logOps      = makeLog('ops');
+exports.logEscalas  = makeLog('escalas');
+exports.logDisps    = makeLog('dispensas');
