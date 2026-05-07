@@ -1256,18 +1256,64 @@ function _renderDetTextoDestacado(doc, texto, M, contentW, y, cb) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// _carregarPdfLib — garante que jsPDF esteja disponível
+//   Tenta resolver de window.jspdf e, se ausente, carrega via CDN
+//   com fallback. Equivalente ao _carregarDocxLib.
+// ═══════════════════════════════════════════════════════════════
+function _carregarPdfLib(cb) {
+  if (typeof window !== 'undefined' && window.jspdf && window.jspdf.jsPDF) {
+    cb(window.jspdf);
+    return;
+  }
+  console.warn('[jsPDF] biblioteca ausente. Tentando carregar do CDN...');
+  var cdns = [
+    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+    'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js',
+    'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js'
+  ];
+  var i = 0;
+  function tentar() {
+    if (i >= cdns.length) {
+      alert('Biblioteca jsPDF não pôde ser carregada.\n\nVerifique sua conexão de internet e tente novamente.');
+      cb(null);
+      return;
+    }
+    var s = document.createElement('script');
+    s.src = cdns[i];
+    s.onload = function() {
+      var lib = window.jspdf;
+      if (lib && lib.jsPDF) {
+        console.log('[jsPDF] carregado via', cdns[i]);
+        cb(lib);
+      } else {
+        console.warn('[jsPDF] script carregou mas biblioteca não detectada em', cdns[i]);
+        i++; tentar();
+      }
+    };
+    s.onerror = function() {
+      console.warn('[jsPDF] falha ao carregar de', cdns[i]);
+      i++; tentar();
+    };
+    document.head.appendChild(s);
+  }
+  tentar();
+}
+
+// ═══════════════════════════════════════════════════════════════
 // _gerarPDFFromEscala — Gera PDF fiel ao modelo PMES
 // ═══════════════════════════════════════════════════════════════
 function _gerarPDFFromEscala(d) {
-  if (typeof window.jspdf === 'undefined') {
-    alert('Biblioteca jsPDF não carregada.');
-    return;
-  }
+  _carregarPdfLib(function(lib) {
+    if (!lib) return;
+    _gerarPDFFromEscalaImpl(d, lib);
+  });
+}
 
+function _gerarPDFFromEscalaImpl(d, jspdfLib) {
   d = _normalizaEscala(d);
 
   try {
-    var jsPDF = window.jspdf.jsPDF;
+    var jsPDF = jspdfLib.jsPDF;
     var doc = new jsPDF({ unit: 'mm', format: 'a4' });
     var W = 210, H = 297, M = 18;
     var contentW = W - 2*M;
