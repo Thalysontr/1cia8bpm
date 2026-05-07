@@ -42,9 +42,23 @@ var _DETERMINACOES_PADRAO = [
     soColheita: true
   },
   {
-    id: 'det_sigeo',
-    titulo: 'DETERMINAÇÃO SIGEO',
-    texto: 'Confeccionar Relatório preenchendo os dados da Operação no SIGEO, imediatamente, após a realização da escala, utilizando no campo específico o Nome da Operação. Os nomes de todos os militares escalados na ISEO, deverão ser relacionados no relatório, no item "3.2 – Observações e Sugestões"; Gerar PDF do relatório e encaminhar via E-Docs para: 1ª CIA/8º BPM. O RELATÓRIO SIGEO DEVERÁ OBRIGATORIAMENTE SER PREENCHIDO E ENCAMINHADO IMPRETERIVELMENTE ATÉ ÀS 10:00 HORAS DO 1º DIA ÚTIL SUBSEQUENTE A ESCALA.',
+    id: 'det_sigeo_1',
+    titulo: 'DETERMINAÇÃO SIGEO — Preenchimento',
+    texto: 'Preencher os dados da Operação no SIGEO ANÁLISE, imediatamente, após a realização da escala, utilizando no campo específico o Nome da Operação "{OPERACAO}". Os nomes de todos os militares escalados na ISEO, deverão ser relacionados no relatório, no item "3.2 – Observações e Sugestões";',
+    incluir: true,
+    soColheita: false
+  },
+  {
+    id: 'det_sigeo_2',
+    titulo: 'DETERMINAÇÃO SIGEO — Envio',
+    texto: 'Gerar PDF do relatório e encaminhar via E-Docs para: 1ª CIA/8º BPM;',
+    incluir: true,
+    soColheita: false
+  },
+  {
+    id: 'det_sigeo_3',
+    titulo: 'DETERMINAÇÃO SIGEO — Prazo',
+    texto: 'O RELATÓRIO SIGEO DEVERÁ OBRIGATORIAMENTE SER PREENCHIDO E ENCAMINHADO IMPRETERIVELMENTE ATÉ ÀS 10:00 HORAS DO 1º DIA ÚTIL SUBSEQUENTE A ESCALA.',
     incluir: true,
     soColheita: false
   }
@@ -753,6 +767,11 @@ function getEscData() {
     if (!d.incluir) return false;
     if (d.soColheita && !isColheita) return false;
     return true;
+  }).map(function(d) {
+    // Substitui placeholder {OPERACAO} pelo nome real da operação (em caixa alta)
+    return Object.assign({}, d, {
+      texto: (d.texto || '').replace(/\{OPERACAO\}/g, (op || '').toUpperCase())
+    });
   });
 
   return {
