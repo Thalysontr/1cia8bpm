@@ -31,10 +31,11 @@ function rMils(){
       var tp=tipoEscala(x.data);
       return '<span style="font-size:10px;font-family:var(--mo);color:'+(tp==='vermelha'?'var(--rd)':'var(--gn)')+'" title="'+x.op+'">'+fd(x.data)+'</span>';
     }).join(' · ');
+    var ngHtml = m.nomeGuerra ? '<strong>'+m.nomeGuerra+'</strong> · ' : '';
     return '<div class="mrow2">'
       +'<div class="av">'+av+'</div>'
       +'<div style="flex:1">'
-        +'<div class="mn">'+m.posto+' — '+m.nome+alertaVerm+'</div>'
+        +'<div class="mn">'+m.posto+' — '+ngHtml+m.nome+alertaVerm+'</div>'
         +'<div class="mm">RG: '+m.rg+' · NF: '+m.nf+(ult?' · Último: '+fd(ult.data)+' — '+ult.op:'')+'</div>'
         +(ultDatas?'<div style="margin-top:3px">'+ultDatas+'</div>':'')
       +'</div>'
@@ -53,15 +54,18 @@ function rMils(){
 function filtrarMils(){rMils();}
 function salvarMil(){
   var po=document.getElementById('mpo').value,no=document.getElementById('mno').value.trim();
+  var ng=(document.getElementById('mng')||{}).value;ng=ng?ng.trim():'';
   var rg=document.getElementById('mrg').value.trim(),nf=document.getElementById('mnf').value.trim();
   var fu=document.getElementById('mfu').value;
   if(!no||!rg)return alert('Preencha nome e RG.');
   if(APP.mils.find(m=>m.rg===rg))return alert('RG já cadastrado.');
-  var mil={posto:po,nome:no,rg:rg,nf:nf,func:fu,hist:[]};
+  var mil={posto:po,nomeGuerra:ng,nome:no,rg:rg,nf:nf,func:fu,hist:[]};
   DB.saveMil(mil,function(){
     reloadMils(function(){ rMils(); show('ma'); });
   });
-  document.getElementById('mno').value='';document.getElementById('mrg').value='';document.getElementById('mnf').value='';
+  document.getElementById('mno').value='';
+  if(document.getElementById('mng'))document.getElementById('mng').value='';
+  document.getElementById('mrg').value='';document.getElementById('mnf').value='';
 }
 function delMilRg(btn){
   var rg=btn.getAttribute('data-rg');

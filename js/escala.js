@@ -99,10 +99,26 @@ var _PARTICULAS_NOME = ['da','de','do','das','dos','e','di','du','del','della','
 //      - 3 palavras → última (3ª)
 //      - 4+ palavras → 3ª palavra (sobrenome de família, deixando "Santos"/"Júnior" etc. fora)
 //      - 2 palavras → última
-function _splitNomeNegrito(nomeCompleto) {
+function _splitNomeNegrito(nomeCompleto, nomeGuerra) {
   var nome = (nomeCompleto || '').trim();
   if (!nome) return { antes: '', negrito: '', depois: '' };
 
+  // ⭐ Se o militar tem nomeGuerra cadastrado, localiza-o dentro do nome completo
+  // (case-insensitive, mas preserva a capitalização do nome completo no antes/negrito/depois)
+  var ng = (nomeGuerra || '').trim();
+  if (ng) {
+    var idxFound = nome.toLowerCase().indexOf(ng.toLowerCase());
+    if (idxFound !== -1) {
+      var antes = nome.substring(0, idxFound);
+      var negrito = nome.substring(idxFound, idxFound + ng.length);
+      var depois = nome.substring(idxFound + ng.length);
+      return { antes: antes, negrito: negrito, depois: depois };
+    }
+    // Se nomeGuerra não estiver no nome completo, mostra-o em negrito antes do nome
+    return { antes: '', negrito: ng, depois: ' ' + nome };
+  }
+
+  // ─── Fallback: heurística antiga para militares sem nomeGuerra cadastrado ───
   var partes = nome.split(/\s+/);
   if (partes.length <= 1) return { antes: '', negrito: nome, depois: '' };
   if (partes.length === 2) return { antes: partes[0] + ' ', negrito: partes[1], depois: '' };
@@ -360,6 +376,7 @@ function _addMilDaBusca(turnoIdx, rg) {
     rg: rg,
     nf: mil.nf || '',
     nome: mil.nome || '',
+    nomeGuerra: mil.nomeGuerra || '',
     posto: mil.posto || '',
     funcao: mil.funcao || funcaoPadrao
   });
@@ -918,7 +935,7 @@ function salvarEsc() {
   d.turnos.forEach(function(t, ti) {
     (t.mils || []).forEach(function(m) {
       todosMils.push({
-        posto: m.posto, nome: m.nome, rg: m.rg, nf: m.nf, funcao: m.funcao,
+        posto: m.posto, nome: m.nome, nomeGuerra: m.nomeGuerra || '', rg: m.rg, nf: m.nf, funcao: m.funcao,
         turno: ti + 1,
         horario: _horarioLabel(t),
         local: _localLabel(t)
@@ -1399,8 +1416,8 @@ function _gerarPDFFromEscala(d) {
           y = checkPage(y, 10);
           doc.setFontSize(9);
 
-          // ── Nome com sobrenome em NEGRITO (fidedigno ao modelo PMES) ──
-          var nomePartes = _splitNomeNegrito(m.nome || '');
+          // ── Nome com nome de guerra em NEGRITO (fidedigno ao modelo PMES) ──
+          var nomePartes = _splitNomeNegrito(m.nome || '', m.nomeGuerra || '');
           doc.setFont('helvetica', 'normal');
           var wAntes = doc.getTextWidth(nomePartes.antes);
           doc.setFont('helvetica', 'bold');
@@ -1867,7 +1884,7 @@ function _gerarDocxFromEscalaImpl(d, docxLib) {
       var milRows = (t.mils || []).map(function(m, mi) {
         contadorMil++;
         // Nome com sobrenome em NEGRITO (3 runs)
-        var np = _splitNomeNegrito(m.nome || '');
+        var np = _splitNomeNegrito(m.nome || '', m.nomeGuerra || '');
         var nomeRuns = [];
         if (np.antes)   nomeRuns.push(new TextRun({ text: np.antes, size: 20 }));
         if (np.negrito) nomeRuns.push(new TextRun({ text: np.negrito, bold: true, size: 20 }));
