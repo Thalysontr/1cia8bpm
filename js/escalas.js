@@ -94,22 +94,18 @@ function cancelarEscala(id) {
       });
     }
 
-    if (vrteValor > 0 && typeof DB.saveVrte === 'function') {
-      var v = APP.vrte || { saldo: 0, hist: [] };
-      var saldoAtual = typeof v.saldo === 'number' ? v.saldo : 0;
-      var novoSaldo = saldoAtual + vrteValor;
-      var hist = (v.hist || v.historico || []).slice();
-      hist.push({
-        id: 'mov_' + Date.now(),
+    if (vrteValor > 0 && typeof DB.addVrteMov === 'function') {
+      // Transação atômica — estorno seguro contra concorrência
+      DB.addVrteMov({
         data: new Date().toISOString().split('T')[0],
         tipo: 'entrada',
+        tipoOp: 'Estorno',
         qtd: vrteValor,
-        saldoApos: novoSaldo,
-        ref: 'Estorno — cancelamento de escala ' + (escala.operacao || '') + ' (' + (escala.data || '') + ')',
-        ts: Date.now()
+        ref: 'Estorno — cancelamento de escala ' + (escala.operacao || '') + ' (' + (escala.data || '') + ')'
+      }, function(updated, err) {
+        if (err) console.error('[cancelarEscala] falha ao estornar VRTE:', err);
+        finalizar();
       });
-
-      DB.saveVrte({ saldo: novoSaldo, hist: hist, historico: hist }, finalizar);
     } else {
       finalizar();
     }

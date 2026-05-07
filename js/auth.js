@@ -73,9 +73,8 @@ function login() {
   }).then(function(cred) {
     _clearAttempts(u);
     _logAcesso(cred.user.uid, 'login');
-    DB.getUsers(function(users) {
-      var found = users.find(function(x) { return x.u === u; });
-      var role  = found ? found.r : 'colaborador';
+    return cred.user.getIdTokenResult().then(function(result) {
+      var role = result.claims.role || 'colaborador';
       CU = { uid: cred.user.uid, u: u, r: role, email: cred.user.email };
       _entrarNoApp();
     });
@@ -141,10 +140,9 @@ function logout() {
 // ─── Sessão persistida — re-login automático ────────────────────
 FBAUTH.onAuthStateChanged(function(user) {
   if (user && !CU) {
-    DB.getUsers(function(users) {
-      var nome  = user.email.replace(EMAIL_DOMAIN, '');
-      var found = users.find(function(x) { return x.u === nome; });
-      var role  = found ? found.r : 'colaborador';
+    user.getIdTokenResult().then(function(result) {
+      var nome = user.email.replace(EMAIL_DOMAIN, '');
+      var role = result.claims.role || 'colaborador';
       CU = { uid: user.uid, u: nome, r: role, email: user.email };
       _entrarNoApp();
     });

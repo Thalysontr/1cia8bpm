@@ -953,19 +953,16 @@ function salvarEsc() {
     DB.saveEsc(escala, function(resultado) {
       console.log('[salvarEsc] DB.saveEsc retornou:', resultado);
 
-      if (d.vrteTotal > 0 && typeof DB.saveVrte === 'function') {
-        var v = APP.vrte || { saldo: 0, hist: [] };
-        var novoSaldo = (v.saldo || 0) - d.vrteTotal;
-        var hist = (v.hist || v.historico || []).slice();
-        hist.push({
+      if (d.vrteTotal > 0 && typeof DB.addVrteMov === 'function') {
+        // Transação atômica — não sobrescreve entradas concorrentes
+        DB.addVrteMov({
           data: d.data,
           tipo: 'saida',
+          tipoOp: d.operacao,
           qtd: d.vrteTotal,
-          saldoApos: novoSaldo,
-          ref: 'Escala — ' + d.operacao,
-          ts: Date.now()
-        });
-        DB.saveVrte({ saldo: novoSaldo, hist: hist, historico: hist }, function() {
+          ref: 'Escala — ' + d.operacao
+        }, function(updated, err) {
+          if (err) console.error('[salvarEsc] falha ao debitar VRTE:', err);
           finalizarSalvar();
         });
       } else {

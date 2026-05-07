@@ -146,6 +146,72 @@ var DB = {
     });
   },
 
+  // ── VRTE TRANSACIONAL ─────────────────────────────────────────
+  // Adiciona um lançamento (entrada ou saída) de forma atômica.
+  // Lê o estado atual do Firestore, calcula novo saldo, escreve — tudo
+  // dentro de uma transação. Garante que escritas concorrentes não
+  // sobrescrevam umas às outras (race condition).
+  //
+  // mov = { data, tipo: 'entrada'|'saida', qtd, tipoOp?, ref?, ts? }
+  addVrteMov: function(mov, cb) {
+    var ref = FBDB.collection('config').doc('vrte');
+    if (!mov.ts) mov.ts = Date.now();
+    return FBDB.runTransaction(function(t) {
+      return t.get(ref).then(function(doc) {
+        var v = doc.exists ? doc.data() : { saldo: 0, hist: [] };
+        var hist = (v.hist || v.historico || []).slice();
+        var saldo = typeof v.saldo === 'number' ? v.saldo : 0;
+        var novoSaldo = mov.tipo === 'entrada'
+          ? saldo + (mov.qtd || 0)
+          : saldo - (mov.qtd || 0);
+        var entry = Object.assign({}, mov, { saldoApos: novoSaldo });
+        hist.push(entry);
+        var updated = { saldo: novoSaldo, hist: hist, historico: hist };
+        t.set(ref, updated);
+        return updated;
+      });
+    }).then(function(updated) {
+      _CACHE.vrte = updated;
+      if (cb) cb(updated);
+    }).catch(function(err) {
+      console.error('[DB.addVrteMov] erro:', err);
+      if (cb) cb(null, err);
+    });
+  },
+
+  // Remove um lançamento por timestamp e recalcula o saldo do zero.
+  // Tudo dentro de uma transação para evitar perdas concorrentes.
+  removeVrteMov: function(ts, cb) {
+    var ref = FBDB.collection('config').doc('vrte');
+    return FBDB.runTransaction(function(t) {
+      return t.get(ref).then(function(doc) {
+        if (!doc.exists) throw new Error('Documento VRTE não existe.');
+        var v = doc.data();
+        var hist = (v.hist || v.historico || []).slice();
+        var idx = hist.findIndex(function(h) { return (h.ts || 0) === ts; });
+        if (idx === -1) throw new Error('Lançamento não encontrado.');
+        hist.splice(idx, 1);
+        // Recalcula saldo do zero, ordenado por timestamp
+        var ordenado = hist.slice().sort(function(a, b) { return (a.ts || 0) - (b.ts || 0); });
+        var saldo = 0;
+        ordenado.forEach(function(h) {
+          if (h.tipo === 'entrada')      saldo += (h.qtd || 0);
+          else if (h.tipo === 'saida')   saldo -= (h.qtd || 0);
+          h.saldoApos = saldo;
+        });
+        var updated = { saldo: saldo, hist: ordenado, historico: ordenado };
+        t.set(ref, updated);
+        return updated;
+      });
+    }).then(function(updated) {
+      _CACHE.vrte = updated;
+      if (cb) cb(updated);
+    }).catch(function(err) {
+      console.error('[DB.removeVrteMov] erro:', err);
+      if (cb) cb(null, err);
+    });
+  },
+
   // ── USUÁRIOS ─────────────────────────────────────────────────
   getUsers: function(cb) {
     if (_CACHE.users) { cb(_CACHE.users); return; }

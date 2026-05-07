@@ -311,21 +311,18 @@ function regVRTE() {
 
   var ref = (opId === 'outro') ? obs : (obs ? tipo + ' — ' + obs : tipo);
 
-  var v = APP.vrte || { saldo: 0, hist: [] };
-  var hist = _getHist(v).slice();
-  var novoSaldo = (v.saldo || 0) + qtd;
-
-  hist.push({
+  // Transação atômica: lê estado atual, soma qtd, grava — sem race condition
+  DB.addVrteMov({
     data: data,
     tipo: 'entrada',
     tipoOp: tipo,
     qtd: qtd,
-    saldoApos: novoSaldo,
-    ref: ref,
-    ts: Date.now()
-  });
-
-  DB.saveVrte({ saldo: novoSaldo, hist: hist, historico: hist }, function() {
+    ref: ref
+  }, function(updated, err) {
+    if (err) {
+      alert('Erro ao registrar entrada: ' + err.message);
+      return;
+    }
     if (qtdEl) qtdEl.value = '';
     if (obsEl) obsEl.value = '';
     if (wrap) { wrap.dataset.sel = ''; _renderOpBtns(); }
@@ -369,27 +366,19 @@ function excluirLancamentoVRTE(ts) {
 
   if (!confirm(msg)) return;
 
-  // Remove o lançamento
-  hist.splice(idx, 1);
-
-  // ⭐ Recalcula o saldo do zero baseado em todos os lançamentos restantes
-  // ordenados por timestamp (entradas + e saídas -)
-  var histOrdenado = hist.slice().sort(function(a, b) { return (a.ts || 0) - (b.ts || 0); });
-  var saldoCalc = 0;
-  histOrdenado.forEach(function(h) {
-    if (h.tipo === 'entrada') saldoCalc += (h.qtd || 0);
-    else if (h.tipo === 'saida') saldoCalc -= (h.qtd || 0);
-    h.saldoApos = saldoCalc;
-  });
-
-  DB.saveVrte({ saldo: saldoCalc, hist: histOrdenado, historico: histOrdenado }, function() {
+  // Transação atômica: remove e recalcula saldo do zero — sem race condition
+  DB.removeVrteMov(ts, function(updated, err) {
+    if (err) {
+      alert('Erro ao excluir: ' + err.message);
+      return;
+    }
     reloadVrte(function() {
       rVRTE();
       if (typeof _atualizarMiniVRTE === 'function') _atualizarMiniVRTE();
 
       var alertEl = document.getElementById('va');
       if (alertEl) {
-        alertEl.textContent = '✓ Lançamento excluído. Novo saldo: ' + saldoCalc.toLocaleString('pt-BR') + ' VRTE';
+        alertEl.textContent = '✓ Lançamento excluído. Novo saldo: ' + (updated.saldo || 0).toLocaleString('pt-BR') + ' VRTE';
         alertEl.style.display = 'block';
         setTimeout(function() { alertEl.style.display = 'none'; }, 4000);
       }
