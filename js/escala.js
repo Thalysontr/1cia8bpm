@@ -1389,7 +1389,20 @@ function _gerarPDFFromEscala(d) {
       doc.text(lines, W/2, y+4, { align:'center' });
       y += mh;
 
-      // 2) Horário (faixa amarela, colada na missão)
+      // 2) Local / posto de serviço (faixa branca colada na missão)
+      var localTxt = _localLabel(t);
+      if (localTxt && localTxt !== '—') {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        var lLines = doc.splitTextToSize('Local: ' + localTxt, contentW - 6);
+        var lh = lLines.length * 4 + 3;
+        doc.setFillColor(255, 255, 255);
+        doc.rect(M, y, contentW, lh, 'FD');
+        doc.text(lLines, W/2, y+4, { align:'center' });
+        y += lh;
+      }
+
+      // 3) Horário (faixa amarela, colada na missão)
       doc.setFillColor(255, 245, 157);
       doc.rect(M, y, contentW, 6, 'FD');
       doc.setFont('helvetica', 'bold');
@@ -1874,7 +1887,19 @@ function _gerarDocxFromEscalaImpl(d, docxLib) {
         })]
       });
 
-      // Linha 2: Horário (mesclada em 6 colunas, fundo amarelo)
+      // Linha 2 (opcional): Local / posto de serviço (mesclada em 6 colunas, fundo branco)
+      var localTxtDocx = _localLabel(t);
+      var rowLocal = (localTxtDocx && localTxtDocx !== '—') ? new TableRow({
+        children: [new TableCell({
+          columnSpan: 6,
+          children: [new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: 'Local: ' + localTxtDocx, bold: true, size: 20 })]
+          })]
+        })]
+      }) : null;
+
+      // Linha 3: Horário (mesclada em 6 colunas, fundo amarelo)
       var rowHorario = new TableRow({
         children: [new TableCell({
           columnSpan: 6,
@@ -1924,9 +1949,10 @@ function _gerarDocxFromEscalaImpl(d, docxLib) {
         milRows.push(new TableRow({ children: [new TableCell({ columnSpan: 6, children:[new Paragraph({ alignment: AlignmentType.CENTER, children:[new TextRun({ text:'(Sem militares)', italics:true, size: 20 })] })] })] }));
       }
 
+      var topRows = rowLocal ? [rowMissao, rowLocal, rowHorario, headerRow] : [rowMissao, rowHorario, headerRow];
       children.push(new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
-        rows: [rowMissao, rowHorario, headerRow].concat(milRows)
+        rows: topRows.concat(milRows)
       }));
       children.push(new Paragraph({ text: '' }));
     });
