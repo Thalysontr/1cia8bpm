@@ -870,7 +870,7 @@ function prevEsc() {
       '<div style="margin-bottom:14px;font-size:11px">',
       '  <div style="background:#7ed3f7;padding:4px;text-align:center;font-weight:700;border:1px solid #888">MUNICÍPIO DE ' + esc((munTurnoPrev || '').toUpperCase()) + '</div>',
       '  <div style="background:#fff;padding:4px;text-align:center;font-style:italic;border:1px solid #888;border-top:none">' + esc(t.missao || _MISSAO_PADRAO) + '</div>',
-      '  <div style="background:#fff;padding:4px;text-align:center;font-weight:700;border:1px solid #888;border-top:none">LOCAL: ' + esc((_localLabel(t) || '').toUpperCase()) + '</div>',
+      '  <div style="background:#c8e6c9;padding:4px;text-align:center;font-weight:700;color:#1b5e20;border:1px solid #888;border-top:none;border-left:4px solid #2e7d32">LOCAL: ' + esc((_localLabel(t) || '').toUpperCase()) + '</div>',
       '  <div style="background:#fff59d;padding:4px;text-align:center;font-weight:700;border:1px solid #888;border-top:none">Horário da escala: ' + esc(_horarioLabel(t)) + '</div>',
       '  <table style="width:100%;border-collapse:collapse;font-size:10px">',
       '    <thead><tr style="background:#eee">',
@@ -1624,16 +1624,27 @@ function _gerarPDFFromEscalaImpl(d, jspdfLib) {
       doc.text(lines, W/2, y+4, { align:'center' });
       y += mh;
 
-      // 2) Local / posto de serviço (faixa branca colada na missão — CAIXA ALTA + NEGRITO)
+      // 2) Local / posto de serviço (faixa VERDE CLARA com listra verde escura à esquerda)
       var localTxt = _localLabel(t);
       if (localTxt && localTxt !== '—') {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
-        var lLines = doc.splitTextToSize('LOCAL: ' + localTxt.toUpperCase(), contentW - 6);
+        var lLines = doc.splitTextToSize('LOCAL: ' + localTxt.toUpperCase(), contentW - 10);
         var lh = lLines.length * 4.5 + 3;
-        doc.setFillColor(255, 255, 255);
+        // Fundo verde claro
+        doc.setFillColor(200, 230, 201); // #c8e6c9
+        doc.setDrawColor(0);
+        doc.setLineWidth(0.3);
         doc.rect(M, y, contentW, lh, 'FD');
+        // Listra verde escura à esquerda (4mm)
+        doc.setFillColor(46, 125, 50); // #2e7d32
+        doc.rect(M, y, 1.5, lh, 'F');
+        // Texto em verde escuro, negrito
+        doc.setTextColor(27, 94, 32); // #1b5e20
         doc.text(lLines, W/2, y+4.5, { align:'center' });
+        // Reset cores
+        doc.setTextColor(0, 0, 0);
+        doc.setDrawColor(0, 0, 0);
         y += lh;
       }
 
@@ -2118,14 +2129,15 @@ function _gerarDocxFromEscalaImpl(d, docxLib) {
         })]
       });
 
-      // Linha 2 (opcional): Local / posto de serviço (mesclada em 6 colunas — CAIXA ALTA + NEGRITO)
+      // Linha 2 (opcional): Local / posto de serviço (faixa VERDE CLARA — CAIXA ALTA + NEGRITO)
       var localTxtDocx = _localLabel(t);
       var rowLocal = (localTxtDocx && localTxtDocx !== '—') ? new TableRow({
         children: [new TableCell({
           columnSpan: 6,
+          shading: { type: ShadingType.SOLID, color: 'C8E6C9', fill: 'C8E6C9' },
           children: [new Paragraph({
             alignment: AlignmentType.CENTER,
-            children: [new TextRun({ text: 'LOCAL: ' + localTxtDocx.toUpperCase(), bold: true, size: 22 })]
+            children: [new TextRun({ text: 'LOCAL: ' + localTxtDocx.toUpperCase(), bold: true, size: 22, color: '1B5E20' })]
           })]
         })]
       }) : null;
