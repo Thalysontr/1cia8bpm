@@ -86,6 +86,10 @@ var _ROTAS_PADRAO = {
 // Carregado do Firestore via DB.getAnexoVisitas() em rNova()
 var _ANEXO_VISITAS = [];
 
+// Flag de edição: quando != null, salvarEsc() atualiza a escala existente
+// em vez de criar uma nova. Usado por editarEscala() em escalas.js.
+var _editandoEscalaId = null;
+
 // ─── Estado ──────────────────────────────────────────────────────
 var _turnos = [];
 var _determinacoes = JSON.parse(JSON.stringify(_DETERMINACOES_PADRAO));
@@ -240,6 +244,8 @@ function rNova() {
 // ═══════════════════════════════════════════════════════════════
 function initTurnos() {
   _turnos = [{
+    municipioPreset: '',
+    municipioCustom: '',
     horarioPreset: '17:00-01:00',
     horarioCustom: '',
     localPreset: 'Área Verde - Avenida Senador Moacyr Dalla - Colatina Velha',
@@ -253,6 +259,8 @@ function initTurnos() {
 function addTurno() {
   var last = _turnos[_turnos.length - 1] || {};
   _turnos.push({
+    municipioPreset: last.municipioPreset || '',
+    municipioCustom: last.municipioCustom || '',
     horarioPreset: last.horarioPreset || '17:00-01:00',
     horarioCustom: last.horarioCustom || '',
     localPreset: last.localPreset || 'Área Verde - Avenida Senador Moacyr Dalla - Colatina Velha',
@@ -289,6 +297,15 @@ function renderTurnos() {
     }).join('') +
     '<option value="__outro__"' + (t.localPreset === '__outro__' ? ' selected' : '') + '>Outro...</option>';
 
+    var munOpts = [
+      { v: '', l: '— Usa o município geral acima —' },
+      { v: 'Colatina / ES', l: 'Colatina / ES' },
+      { v: 'Marilândia / ES', l: 'Marilândia / ES' },
+      { v: '__outro__', l: 'Outro...' }
+    ].map(function(o) {
+      return '<option value="' + esc(o.v) + '"' + (o.v === (t.municipioPreset || '') ? ' selected' : '') + '>' + esc(o.l) + '</option>';
+    }).join('');
+
     return [
       '<div style="border:1.5px solid var(--b);border-radius:var(--r);padding:14px;margin-bottom:14px;background:var(--s2)">',
       '  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">',
@@ -297,18 +314,24 @@ function renderTurnos() {
       '  </div>',
 
       '  <div class="fr">',
+      '    <div class="fg"><label>Município / UF deste turno <span style="font-size:10px;color:var(--t3);font-weight:400">(opcional — sobrepõe o geral)</span></label>',
+      '      <select onchange="atualizarTurno(' + idx + ',\'municipioPreset\',this.value);renderTurnos()">' + munOpts + '</select>',
+      t.municipioPreset === '__outro__'
+        ? '      <input type="text" placeholder="Descreva o município" value="' + esc(t.municipioCustom || '') + '" oninput="atualizarTurno(' + idx + ',\'municipioCustom\',this.value)" style="margin-top:6px"/>'
+        : '',
+      '    </div>',
       '    <div class="fg"><label>Horário da escala *</label>',
       '      <select onchange="atualizarTurno(' + idx + ',\'horarioPreset\',this.value);renderTurnos()">' + horOpts + '</select>',
       t.horarioPreset === '__outro__'
         ? '      <input type="text" placeholder="Ex: Das 15h00min às 23h00min" value="' + esc(t.horarioCustom || '') + '" oninput="atualizarTurno(' + idx + ',\'horarioCustom\',this.value)" style="margin-top:6px"/>'
         : '',
       '    </div>',
-      '    <div class="fg"><label>Local / posto de serviço *</label>',
-      '      <select onchange="atualizarTurno(' + idx + ',\'localPreset\',this.value);renderTurnos()">' + locOpts + '</select>',
+      '  </div>',
+      '  <div class="fg"><label>Local / posto de serviço *</label>',
+      '    <select onchange="atualizarTurno(' + idx + ',\'localPreset\',this.value);renderTurnos()">' + locOpts + '</select>',
       t.localPreset === '__outro__'
-        ? '      <input type="text" placeholder="Descreva o local" value="' + esc(t.localCustom || '') + '" oninput="atualizarTurno(' + idx + ',\'localCustom\',this.value)" style="margin-top:6px"/>'
+        ? '    <input type="text" placeholder="Descreva o local" value="' + esc(t.localCustom || '') + '" oninput="atualizarTurno(' + idx + ',\'localCustom\',this.value)" style="margin-top:6px"/>'
         : '',
-      '    </div>',
       '  </div>',
 
       '  <div class="fg"><label>Missão / descrição da operação',
@@ -742,6 +765,13 @@ function _localLabel(t) {
   return t.localPreset || '—';
 }
 
+// Município efetivo de um turno: turno tem prioridade; se vazio, usa o global da escala.
+function _municipioTurno(t, escalaMun) {
+  if (t && t.municipioPreset === '__outro__') return t.municipioCustom || escalaMun || '';
+  if (t && t.municipioPreset) return t.municipioPreset;
+  return escalaMun || '';
+}
+
 // ═══════════════════════════════════════════════════════════════
 // COLETA DE DADOS
 // ═══════════════════════════════════════════════════════════════
@@ -835,10 +865,12 @@ function prevEsc() {
       '</tr>';
     }).join('');
 
+    var munTurnoPrev = _municipioTurno(t, d.municipio);
     return [
       '<div style="margin-bottom:14px;font-size:11px">',
-      '  <div style="background:#fff59d;padding:4px;text-align:center;font-weight:700;border:1px solid #888">' + esc(_localLabel(t)) + '</div>',
+      '  <div style="background:#7ed3f7;padding:4px;text-align:center;font-weight:700;border:1px solid #888">MUNICÍPIO DE ' + esc((munTurnoPrev || '').toUpperCase()) + '</div>',
       '  <div style="background:#fff;padding:4px;text-align:center;font-style:italic;border:1px solid #888;border-top:none">' + esc(t.missao || _MISSAO_PADRAO) + '</div>',
+      '  <div style="background:#fff;padding:4px;text-align:center;font-weight:700;border:1px solid #888;border-top:none">LOCAL: ' + esc((_localLabel(t) || '').toUpperCase()) + '</div>',
       '  <div style="background:#fff59d;padding:4px;text-align:center;font-weight:700;border:1px solid #888;border-top:none">Horário da escala: ' + esc(_horarioLabel(t)) + '</div>',
       '  <table style="width:100%;border-collapse:collapse;font-size:10px">',
       '    <thead><tr style="background:#eee">',
@@ -873,7 +905,6 @@ function prevEsc() {
     d.ordemNum ? '      <div style="background:#fff59d;font-weight:700;font-size:13px;padding:2px;text-decoration:underline">ORDEM DE OPERAÇÃO Nº ' + esc(d.ordemNum) + '</div>' : '',
     '    </div>',
     '    <div style="margin-top:14px;font-size:11px"><strong>DATA:</strong> ' + fd(d.data).toUpperCase() + ' (' + diaSemana + ')</div>',
-    '    <div style="background:#7ed3f7;font-weight:700;text-align:center;padding:3px;margin-top:8px;font-size:12px">MUNICÍPIO DE ' + esc(d.municipio.toUpperCase()) + '</div>',
     '    <div style="margin-top:10px">' + turnosHtml + '</div>',
     detsHtml ? '    <div style="margin-top:14px;font-size:11px">' + detsHtml + '</div>' : '',
     '    <div style="margin-top:24px;text-align:center;font-size:11px">Colatina-ES, ' + new Date().toLocaleDateString('pt-BR', {day:'2-digit',month:'long',year:'numeric'}) + '.</div>',
@@ -964,7 +995,16 @@ function salvarEsc() {
     });
   });
 
-  var id = 'esc_' + Date.now();
+  var isEdit = !!_editandoEscalaId;
+  var id     = isEdit ? _editandoEscalaId : ('esc_' + Date.now());
+
+  // Captura o vrteTotal antigo antes do save (para calcular delta após)
+  var oldVrteTotal = 0;
+  if (isEdit) {
+    var oldEsc = (APP.escs || []).find(function(e) { return e.id === id; });
+    if (oldEsc) oldVrteTotal = oldEsc.vrteTotal || 0;
+  }
+
   var escala = {
     id: id,
     operacao:  d.operacao,
@@ -982,7 +1022,8 @@ function salvarEsc() {
     vrteTotal: d.vrteTotal,
     cancelada: false,
     status:    'ativa',
-    criadaEm:  new Date().toISOString()
+    criadaEm:  isEdit ? (oldEsc && oldEsc.criadaEm) || new Date().toISOString() : new Date().toISOString(),
+    editadaEm: isEdit ? new Date().toISOString() : undefined
   };
 
   console.log('[salvarEsc] chamando DB.saveEsc com:', escala);
@@ -991,8 +1032,27 @@ function salvarEsc() {
     DB.saveEsc(escala, function(resultado) {
       console.log('[salvarEsc] DB.saveEsc retornou:', resultado);
 
-      if (d.vrteTotal > 0 && typeof DB.addVrteMov === 'function') {
-        // Transação atômica — não sobrescreve entradas concorrentes
+      if (typeof DB.addVrteMov !== 'function') {
+        finalizarSalvar();
+        return;
+      }
+
+      if (isEdit) {
+        // EDIÇÃO: aplicar apenas o DELTA do VRTE (novo - antigo)
+        var delta = (d.vrteTotal || 0) - oldVrteTotal;
+        if (delta === 0) { finalizarSalvar(); return; }
+        DB.addVrteMov({
+          data: d.data,
+          tipo: delta > 0 ? 'saida' : 'entrada',
+          tipoOp: delta > 0 ? d.operacao : 'Ajuste',
+          qtd: Math.abs(delta),
+          ref: 'Ajuste — edição da escala ' + d.operacao + ' (' + d.data + ')'
+        }, function(updated, err) {
+          if (err) console.error('[salvarEsc/edit] falha ao ajustar VRTE:', err);
+          finalizarSalvar();
+        });
+      } else if (d.vrteTotal > 0) {
+        // NOVA ESCALA: débito completo do vrteTotal
         DB.addVrteMov({
           data: d.data,
           tipo: 'saida',
@@ -1019,7 +1079,9 @@ function salvarEsc() {
 
     fnEscs(function() {
       fnVrte(function() {
-        alertaOk('Escala salva com sucesso!');
+        alertaOk(isEdit ? 'Escala atualizada com sucesso!' : 'Escala salva com sucesso!');
+        _editandoEscalaId = null;       // limpa flag de edição
+        _atualizarBannerEdicao();       // remove banner amarelo
         _turnos = [];
         _determinacoes = JSON.parse(JSON.stringify(_DETERMINACOES_PADRAO));
         initTurnos();
@@ -1032,9 +1094,132 @@ function salvarEsc() {
         if (parea) parea.innerHTML = '';
         updVN();
         setTimeout(hideAlertas, 3000);
+        if (isEdit && typeof nav === 'function') nav('escalas', null);
       });
     });
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EDITAR ESCALA — carrega dados de uma escala existente no form "Nova Escala"
+// ═══════════════════════════════════════════════════════════════
+function editarEscala(id) {
+  var escala = (APP.escs || []).find(function(e) { return e.id === id; });
+  if (!escala) { alert('Escala não encontrada.'); return; }
+  if (escala.cancelada || escala.status === 'cancelada') {
+    alert('Não é possível editar uma escala cancelada.');
+    return;
+  }
+
+  _editandoEscalaId = id;
+
+  // Vai para o painel "Nova Escala"
+  var navItem = document.querySelector('.ni[onclick*="nova"]');
+  if (typeof nav === 'function') nav('nova', navItem);
+
+  // Aguarda o painel renderizar antes de popular
+  setTimeout(function() {
+    // Dados gerais
+    var eo  = document.getElementById('eo');
+    var ed  = document.getElementById('ed');
+    var em  = document.getElementById('em');
+    var edu = document.getElementById('edu');
+
+    if (eo) {
+      var found = false;
+      for (var i = 0; i < eo.options.length; i++) {
+        if (eo.options[i].value === escala.operacao) { eo.value = escala.operacao; found = true; break; }
+      }
+      if (!found && eo.options.length) {
+        // operação não existe na lista — usa "Outra"
+        var outroOpt = eo.querySelector('option[value="__outra__"]');
+        if (outroOpt) {
+          eo.value = '__outra__';
+          var eoOutro = document.getElementById('eo-outro');
+          if (eoOutro) { eoOutro.value = escala.operacao; eoOutro.style.display = ''; }
+        }
+      }
+    }
+    if (ed)  ed.value  = escala.data || '';
+    if (em && escala.municipio) {
+      var foundM = false;
+      for (var j = 0; j < em.options.length; j++) {
+        if (em.options[j].value === escala.municipio) { em.value = escala.municipio; foundM = true; break; }
+      }
+      if (!foundM) {
+        em.value = '__outra__';
+        var emOutro = document.getElementById('em-outro');
+        if (emOutro) { emOutro.value = escala.municipio; emOutro.style.display = ''; }
+      }
+    }
+    if (edu) edu.value = String(escala.duracao || '');
+
+    if (escala.ordemNum) {
+      var ordChk = document.getElementById('incl-ordem');
+      var ordWrap = document.getElementById('ordem-num-wrap');
+      var ordNum = document.getElementById('ordem-num');
+      if (ordChk) ordChk.checked = true;
+      if (ordWrap) ordWrap.style.display = '';
+      if (ordNum) ordNum.value = escala.ordemNum;
+    }
+
+    if (escala.assinante) {
+      var ean = document.getElementById('ean'); if (ean) ean.value = escala.assinante.nome || '';
+      var ear = document.getElementById('ear'); if (ear) ear.value = escala.assinante.rg || '';
+      var eac = document.getElementById('eac'); if (eac) eac.value = escala.assinante.cargo || '';
+    }
+
+    if (escala.inclRotas !== undefined) {
+      var rChk = document.getElementById('incl-rotas');
+      if (rChk) rChk.checked = !!escala.inclRotas;
+    }
+
+    // Turnos e determinações
+    if (escala.turnos && escala.turnos.length) {
+      _turnos = JSON.parse(JSON.stringify(escala.turnos));
+    } else {
+      initTurnos();
+    }
+    if (escala.determinacoes && escala.determinacoes.length) {
+      _determinacoes = JSON.parse(JSON.stringify(escala.determinacoes));
+    }
+
+    if (typeof renderTurnos === 'function') renderTurnos();
+    if (typeof _renderDeterminacoesContent === 'function') _renderDeterminacoesContent();
+    if (typeof updVN === 'function') updVN();
+
+    _atualizarBannerEdicao();
+
+    // Scroll pro topo
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, 200);
+}
+
+function cancelarEdicao() {
+  if (!confirm('Cancelar a edição? As alterações não serão salvas.')) return;
+  _editandoEscalaId = null;
+  _atualizarBannerEdicao();
+  _turnos = [];
+  _determinacoes = JSON.parse(JSON.stringify(_DETERMINACOES_PADRAO));
+  initTurnos();
+  if (typeof _renderDeterminacoesContent === 'function') _renderDeterminacoesContent();
+  var eo = document.getElementById('eo'); if (eo) eo.value = '';
+  var edu = document.getElementById('edu'); if (edu) edu.value = '';
+  if (typeof nav === 'function') nav('escalas', null);
+}
+
+function _atualizarBannerEdicao() {
+  var pn = document.getElementById('pn');
+  if (!pn) return;
+  var existing = document.getElementById('banner-edicao-escala');
+  if (existing) existing.remove();
+  if (!_editandoEscalaId) return;
+  var banner = document.createElement('div');
+  banner.id = 'banner-edicao-escala';
+  banner.style.cssText = 'background:#fff59d;border:2px solid #b45309;border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:#7c2d12';
+  banner.innerHTML = '<span>✏️ Editando escala existente — VRTE será ajustado pelo delta ao salvar.</span>' +
+    '<button class="btn brd bsm" onclick="cancelarEdicao()" style="margin-left:12px">× Cancelar edição</button>';
+  pn.insertBefore(banner, pn.firstChild);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1412,18 +1597,20 @@ function _gerarPDFFromEscalaImpl(d, jspdfLib) {
     doc.text('DATA: ' + dataFmt + (diaSem ? ' (' + diaSem + ')' : ''), M, y+4);
     y += 8;
 
-    // ─── MUNICÍPIO ───
-    doc.setFillColor(126, 211, 247);
-    doc.rect(M, y, contentW, 7, 'F');
-    doc.setFontSize(12);
-    doc.text('MUNICÍPIO DE ' + (d.municipio || '').toUpperCase(), W/2, y+4.8, { align:'center' });
-    y += 9;
-
-    // ─── TURNOS (cada turno = bloco com missão + horário + tabela) ───
+    // ─── TURNOS (cada turno = bloco com município + missão + local + horário + tabela) ───
     // Numeração contínua entre turnos (1,2 / 3,4,5...) — fidedigno ao modelo
     var contadorMilPdf = 0;
     d.turnos.forEach(function(t, ti) {
       y = checkPage(y, 50);
+
+      // 0) Município deste turno (faixa azul, fidedigno ao modelo PMES)
+      var munTurno = _municipioTurno(t, d.municipio);
+      doc.setFillColor(126, 211, 247);
+      doc.rect(M, y, contentW, 7, 'F');
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('MUNICÍPIO DE ' + (munTurno || '').toUpperCase(), W/2, y+4.8, { align:'center' });
+      y += 9;
 
       // 1) Missão (caixa com borda — texto em NEGRITO centralizado, igual ao modelo)
       doc.setFont('helvetica', 'bold');
@@ -1905,24 +2092,20 @@ function _gerarDocxFromEscalaImpl(d, docxLib) {
       children: [new TextRun({ text:'DATA: ', bold:true }), new TextRun(dataStr + (diaSem ? ' (' + diaSem + ')' : ''))]
     }));
 
-    // Município
-    children.push(new Paragraph({
-      alignment: AlignmentType.CENTER,
-      shading: { type: ShadingType.SOLID, color: '7ED3F7', fill: '7ED3F7' },
-      children: [new TextRun({ text:'MUNICÍPIO DE ' + (d.municipio||'').toUpperCase(), bold:true, size:22 })]
-    }));
-    children.push(new Paragraph({ text:'' }));
-
     // Turnos — fidedigno ao modelo PMES:
-    //   A tabela tem 4 linhas mescladas no topo:
-    //     1) Missão (negrito centralizado)
-    //     2) Horário com fundo AMARELO
-    //   Depois vem o cabeçalho (Ordem | Posto/Grad. | Nome | RG | NF | Função)
-    //   E em seguida as linhas dos militares.
-    //   IMPORTANTE: numeração dos militares é CONTÍNUA entre turnos (1,2 / 3,4,5).
+    //   Cada turno é autocontido com seu MUNICÍPIO + missão + local + horário + tabela.
+    //   Numeração dos militares é CONTÍNUA entre turnos (1,2 / 3,4,5).
     var contadorMil = 0;
     d.turnos.forEach(function(t) {
       var headers = ['Ordem', 'Posto/Grad.', 'Nome Completo', 'RG', 'NF', 'Função'];
+
+      // Município do turno (faixa azul antes da tabela)
+      var munTurnoDocx = _municipioTurno(t, d.municipio);
+      children.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        shading: { type: ShadingType.SOLID, color: '7ED3F7', fill: '7ED3F7' },
+        children: [new TextRun({ text:'MUNICÍPIO DE ' + (munTurnoDocx || '').toUpperCase(), bold:true, size:22 })]
+      }));
 
       // Linha 1: Missão (mesclada em 6 colunas)
       var rowMissao = new TableRow({

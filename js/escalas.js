@@ -36,6 +36,7 @@ function rEscs() {
       : '<div style="display:flex;gap:4px;flex-wrap:wrap">' +
         '<button class="btn bsm" onclick="baixarPDFEscala(\'' + idSafe + '\')" title="Baixar PDF">📄 PDF</button>' +
         '<button class="btn bsm" onclick="baixarDocxEscala(\'' + idSafe + '\')" title="Baixar DOCX">📝 DOCX</button>' +
+        '<button class="btn bsm" onclick="editarEscala(\'' + idSafe + '\')" title="Editar esta escala" style="background:#1565c0;color:#fff">✏ Editar</button>' +
         '<button class="btn brd bsm" onclick="cancelarEscala(\'' + idSafe + '\')" title="Cancelar e estornar VRTE">× Cancelar</button>' +
         '</div>';
 
