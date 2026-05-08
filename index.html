@@ -345,7 +345,13 @@
       <!-- ESCALAS -->
       <div id="pe" class="panel">
         <div class="ph"><div class="pt">Escalas geradas</div><div class="ps">Histórico completo</div></div>
-        <div class="card"><div class="ch"><span class="ct">Todas as escalas</span></div>
+        <div class="card"><div class="ch" style="flex-wrap:wrap;gap:8px">
+            <span class="ct">Todas as escalas</span>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--t2);cursor:pointer;user-select:none">
+              <input type="checkbox" id="escs-mostrar-canceladas" onchange="rEscs()" style="cursor:pointer"/>
+              Mostrar canceladas
+            </label>
+          </div>
           <div class="tw"><table><thead><tr><th>Data</th><th>Operação</th><th>Município</th><th>Dur.</th><th>VRTE</th><th>Militares</th><th>Ações</th></tr></thead><tbody id="etb"></tbody></table></div>
         </div>
       </div>

@@ -12,12 +12,33 @@ function rEscs() {
     return;
   }
 
-  var escs = (APP.escs || []).slice().sort(function(a, b) {
+  var todas = (APP.escs || []).slice().sort(function(a, b) {
     return (b.data || '').localeCompare(a.data || '');
   });
 
+  var mostrarCanceladas = !!(document.getElementById('escs-mostrar-canceladas') || {}).checked;
+
+  var escs = mostrarCanceladas
+    ? todas
+    : todas.filter(function(e) { return !(e.cancelada === true || e.status === 'cancelada'); });
+
+  var qtdCanceladas = todas.length - todas.filter(function(e) {
+    return !(e.cancelada === true || e.status === 'cancelada');
+  }).length;
+
+  // Atualiza o label do checkbox com contagem
+  var lbl = document.querySelector('label[for="escs-mostrar-canceladas"]') ||
+            (document.getElementById('escs-mostrar-canceladas') || {}).parentElement;
+  if (lbl && qtdCanceladas > 0) {
+    var txt = lbl.lastChild;
+    if (txt && txt.nodeType === 3) txt.textContent = ' Mostrar canceladas (' + qtdCanceladas + ')';
+  }
+
   if (!escs.length) {
-    tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:20px">Nenhuma escala registrada.</td></tr>';
+    var msg = !todas.length
+      ? 'Nenhuma escala registrada.'
+      : (mostrarCanceladas ? 'Nenhuma escala encontrada.' : 'Nenhuma escala ativa. Marque "Mostrar canceladas" para ver as ' + qtdCanceladas + ' canceladas.');
+    tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:20px">' + msg + '</td></tr>';
     return;
   }
 
