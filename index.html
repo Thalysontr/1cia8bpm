@@ -128,6 +128,16 @@
         </svg>
         <span class="ni-label">Dispensas</span>
       </div>
+      <div class="ni" onclick="nav('relatorios',this)" title="Relatórios">
+        <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 3h18v18H3z"/>
+          <path d="M3 9h18"/>
+          <path d="M9 21V9"/>
+          <line x1="13" y1="13" x2="17" y2="13"/>
+          <line x1="13" y1="17" x2="17" y2="17"/>
+        </svg>
+        <span class="ni-label">Relatórios</span>
+      </div>
     </div>
     <div class="sb-bottom">
       <hr class="sb-divider"/>
@@ -408,6 +418,35 @@
       <!-- DISPENSAS -->
       <div id="pdisp" class="panel"></div>
 
+      <!-- RELATÓRIOS -->
+      <div id="prel" class="panel">
+        <div class="ph">
+          <div class="pt">Relatórios</div>
+          <div class="ps">Relatório mensal ISEO consolidado</div>
+        </div>
+        <div class="card">
+          <div class="ch"><span class="ct">Gerar relatório mensal</span></div>
+          <div class="fr3">
+            <div class="fg">
+              <label>Mês de referência</label>
+              <input type="month" id="rel-mes"/>
+            </div>
+            <div class="fg">
+              <label>Número da CI</label>
+              <input type="text" id="rel-ci" placeholder="Ex: 070/2026"/>
+            </div>
+            <div class="fg" style="display:flex;align-items:flex-end">
+              <button class="btn bp" onclick="gerarPreviewRelatorio()" style="width:100%">Gerar prévia</button>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--t2);margin-top:8px">
+            A prévia é editável: você pode reordenar a coluna ORDEM com os botões ↑↓ antes de exportar.
+            Apenas escalas <strong>ativas</strong> do mês entram no relatório.
+          </div>
+        </div>
+        <div id="rel-preview"></div>
+      </div>
+
       <!-- CONFIG -->
       <div id="pc" class="panel">
         <div class="ph"><div class="pt">Configurações</div><div class="ps">Usuários, assinantes e dados</div></div>
@@ -484,6 +523,7 @@ var TMPL_B64="UEsDBBQAAAAIAIFdlVzJf3/HuAEAABMJAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbL
 <script src="js/militares.js"></script>
 <script src="js/config.js"></script>
 <script src="js/dispensas.js"></script>
+<script src="js/relatorio.js"></script>
 <script src="js/patches.js"></script>
 <script src="js/vrte_painel_patch.js"></script>
 

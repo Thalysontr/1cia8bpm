@@ -15,7 +15,7 @@ var APP = {
 };
 
 // ─── Navegação ──────────────────────────────────────────────────
-var PNL = { painel:'pp', vrte:'pv', ops:'po', nova:'pn', escalas:'pe', mils:'pm', cfg:'pc', disp:'pdisp' };
+var PNL = { painel:'pp', vrte:'pv', ops:'po', nova:'pn', escalas:'pe', mils:'pm', cfg:'pc', disp:'pdisp', relatorios:'prel' };
 
 function nav(id, el) {
   document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('on'); });
@@ -26,14 +26,15 @@ function nav(id, el) {
 }
 
 function render(id) {
-  if (id === 'painel')  rPainel();
-  if (id === 'vrte')    rVRTE();
-  if (id === 'ops')     rOps();
-  if (id === 'nova')    rNova();
-  if (id === 'escalas') rEscs();
-  if (id === 'mils')    rMils();
-  if (id === 'cfg')     rCfg();
-  if (id === 'disp')    rDisp();
+  if (id === 'painel')      rPainel();
+  if (id === 'vrte')        rVRTE();
+  if (id === 'ops')         rOps();
+  if (id === 'nova')        rNova();
+  if (id === 'escalas')     rEscs();
+  if (id === 'mils')        rMils();
+  if (id === 'cfg')         rCfg();
+  if (id === 'disp')        rDisp();
+  if (id === 'relatorios' && typeof rRelatorios === 'function') rRelatorios();
 }
 
 // ─── Inicialização — carrega tudo do Firestore antes de renderizar
