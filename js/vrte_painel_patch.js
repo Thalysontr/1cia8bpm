@@ -34,12 +34,22 @@ function _vrteDataDe(h) {
 // Determina a operação canônica de um lançamento.
 // Retorna { id, label, cor } da VRTE_OPS, ou um objeto custom para "Outra".
 //
-// FUZZY MATCH: aceita tanto labels exatos ("Colheita") quanto nomes
-// completos vindos das escalas ("OPERAÇÃO COLHEITA", "FORÇA E PRESENÇA",
-// "FORÇA TOTAL", "VERÃO" — case-insensitive, busca por substring).
+// FUZZY MATCH em 3 níveis:
+//   1) tipoOp == label (match exato)
+//   2) tipoOp contém label (case-insensitive substring)
+//   3) ref contém label (caso lançamentos antigos sem tipoOp, formato
+//      "Escala — OPERAÇÃO COLHEITA")
 function _vrteIdentificarOp(h) {
   var ops = _vrteGetOps();
   var tipoOp = (h.tipoOp || '').trim();
+
+  // ⭐ Fallback: lançamentos antigos podem ter tipoOp vazio mas ref preenchida.
+  //    Extrai o nome da operação de "Escala — XXX" ou usa a ref direta.
+  if (!tipoOp && h.ref) {
+    var ref = String(h.ref);
+    var m = ref.match(/Escala\s*[—\-]\s*(.+?)(?:\s*\(|$)/i);
+    tipoOp = m ? m[1].trim() : ref.trim();
+  }
 
   // 1) Match exato pelo label
   for (var i = 0; i < ops.length; i++) {
@@ -49,9 +59,6 @@ function _vrteIdentificarOp(h) {
 
   // 2) Match fuzzy: tipoOp contém o label (case-insensitive)
   //    Exemplo: "OPERAÇÃO COLHEITA" contém "COLHEITA" → bucket Colheita
-  //             "FORÇA E PRESENÇA" → bucket Força e Presença
-  //    Ordem importante: 'Força Total' antes de 'Força e Presença' não interfere
-  //    porque cada label é checado contra o tipoOp completo.
   if (tipoOp) {
     var tipoUpper = tipoOp.toUpperCase();
     for (var j = 0; j < ops.length; j++) {
@@ -61,8 +68,6 @@ function _vrteIdentificarOp(h) {
   }
 
   // 3) Não bateu com nenhuma fixa → cai em "Outra operação"
-  //    Se tiver tipoOp preenchido, usa ele como rótulo personalizado;
-  //    senão, usa o label genérico "Outra operação"
   var outraOp = ops.find(function(o) { return o.id === 'outro'; }) || _VRTE_OPS_FALLBACK[4];
   if (tipoOp) {
     return { id: 'outro:' + tipoOp, label: tipoOp, cor: outraOp.cor };
