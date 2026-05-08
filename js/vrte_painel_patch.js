@@ -33,17 +33,34 @@ function _vrteDataDe(h) {
 
 // Determina a operação canônica de um lançamento.
 // Retorna { id, label, cor } da VRTE_OPS, ou um objeto custom para "Outra".
+//
+// FUZZY MATCH: aceita tanto labels exatos ("Colheita") quanto nomes
+// completos vindos das escalas ("OPERAÇÃO COLHEITA", "FORÇA E PRESENÇA",
+// "FORÇA TOTAL", "VERÃO" — case-insensitive, busca por substring).
 function _vrteIdentificarOp(h) {
   var ops = _vrteGetOps();
   var tipoOp = (h.tipoOp || '').trim();
 
-  // 1) Match exato pelo label (Colheita, Força e Presença, Força Total, Verão)
+  // 1) Match exato pelo label
   for (var i = 0; i < ops.length; i++) {
     if (ops[i].id === 'outro') continue;
     if (ops[i].label === tipoOp) return ops[i];
   }
 
-  // 2) Não bateu com nenhuma fixa → cai em "Outra operação"
+  // 2) Match fuzzy: tipoOp contém o label (case-insensitive)
+  //    Exemplo: "OPERAÇÃO COLHEITA" contém "COLHEITA" → bucket Colheita
+  //             "FORÇA E PRESENÇA" → bucket Força e Presença
+  //    Ordem importante: 'Força Total' antes de 'Força e Presença' não interfere
+  //    porque cada label é checado contra o tipoOp completo.
+  if (tipoOp) {
+    var tipoUpper = tipoOp.toUpperCase();
+    for (var j = 0; j < ops.length; j++) {
+      if (ops[j].id === 'outro') continue;
+      if (tipoUpper.indexOf(ops[j].label.toUpperCase()) !== -1) return ops[j];
+    }
+  }
+
+  // 3) Não bateu com nenhuma fixa → cai em "Outra operação"
   //    Se tiver tipoOp preenchido, usa ele como rótulo personalizado;
   //    senão, usa o label genérico "Outra operação"
   var outraOp = ops.find(function(o) { return o.id === 'outro'; }) || _VRTE_OPS_FALLBACK[4];

@@ -19,8 +19,10 @@ var _HORARIOS_PADRAO = [
 ];
 
 var _LOCAIS_PADRAO = [
-  'Área Verde',
-  'São Pedro, Santo Antônio, São Miguel, São Marcos e Adjacências'
+  'Área Verde - Avenida Senador Moacyr Dalla - Colatina Velha',
+  'São Silvano/Nossa Senhora Aparecida/Santo Antônio/São Pedro/São Marcos/Adjacências',
+  'Vila Lenira/Olívio Zanotelli/Santa Terezinha/Maria Ismênia/Vista da Serra/Adjacências',
+  'Centro/Colatina Velha/Bela Vista/Adjacências'
 ];
 
 var _MISSAO_PADRAO = 'Fazer saturação nos bairros com planejamento específico de ações repressivas, locais sensíveis com alto índice de violência, tráfico, dentre outros delitos';
@@ -240,7 +242,7 @@ function initTurnos() {
   _turnos = [{
     horarioPreset: '17:00-01:00',
     horarioCustom: '',
-    localPreset: 'Área Verde',
+    localPreset: 'Área Verde - Avenida Senador Moacyr Dalla - Colatina Velha',
     localCustom: '',
     missao: _MISSAO_PADRAO,
     mils: []
@@ -253,7 +255,7 @@ function addTurno() {
   _turnos.push({
     horarioPreset: last.horarioPreset || '17:00-01:00',
     horarioCustom: last.horarioCustom || '',
-    localPreset: last.localPreset || 'Área Verde',
+    localPreset: last.localPreset || 'Área Verde - Avenida Senador Moacyr Dalla - Colatina Velha',
     localCustom: last.localCustom || '',
     missao: last.missao || _MISSAO_PADRAO,
     mils: []
