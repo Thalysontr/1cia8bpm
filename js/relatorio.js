@@ -81,8 +81,9 @@ function _ordenarPorAntiguidade(mils) {
 //     porMilitar: { rg: { key: [dias] } }
 //   }
 function _coletarDadosMes(escs, mes, ano) {
-  var porMilitar = {};   // rg → { 'OPERAÇÃO-Nh': [dias] }
-  var combMap = {};      // key → { op, horas, label }
+  var porMilitar = {};    // rg → { 'OPERAÇÃO-Nh': [dias] }
+  var combMap = {};       // key → { op, horas, label }
+  var totaisVRTE = {};    // key → soma de vrteTotal das escalas
 
   (escs || []).forEach(function(e) {
     if (!e || e.cancelada === true || e.status === 'cancelada') return;
@@ -108,6 +109,9 @@ function _coletarDadosMes(escs, mes, ano) {
         key: key
       };
     }
+
+    // Soma VRTE total da escala no bucket correspondente
+    totaisVRTE[key] = (totaisVRTE[key] || 0) + (parseInt(e.vrteTotal, 10) || 0);
 
     // Coleta militares de TODOS os turnos (dedupe por rg)
     var rgsVistos = {};
@@ -141,7 +145,32 @@ function _coletarDadosMes(escs, mes, ano) {
     return a.horas - b.horas;
   });
 
-  return { combinacoes: combinacoes, porMilitar: porMilitar };
+  // Calcula totais ISEO (count de células preenchidas) por combinação
+  var totaisISEO = {};
+  combinacoes.forEach(function(c) { totaisISEO[c.key] = 0; });
+  Object.keys(porMilitar).forEach(function(rg) {
+    Object.keys(porMilitar[rg]).forEach(function(key) {
+      totaisISEO[key] = (totaisISEO[key] || 0) + porMilitar[rg][key].length;
+    });
+  });
+
+  return {
+    combinacoes: combinacoes,
+    porMilitar: porMilitar,
+    totaisISEO: totaisISEO,
+    totaisVRTE: totaisVRTE
+  };
+}
+
+// Label curto da categoria para a tabela-resumo final
+// COLHEITA → "RURAL"; FORÇA E PRESENÇA → "F. PRES."; etc.
+function _categoriaLabelCurto(label) {
+  var u = String(label || '').toUpperCase();
+  if (u === 'COLHEITA')          return 'RURAL';
+  if (u === 'FORÇA E PRESENÇA')  return 'F. PRES.';
+  if (u === 'FORÇA TOTAL')       return 'F. TOTAL';
+  if (u === 'VERÃO')             return 'VERÃO';
+  return u;
 }
 
 // Prioridade de exibição das operações (igual ao modelo PMES)
@@ -246,6 +275,8 @@ function gerarPreviewRelatorio() {
     mils: mils,
     combinacoes: dados.combinacoes,
     porMilitar: dados.porMilitar,
+    totaisISEO: dados.totaisISEO,
+    totaisVRTE: dados.totaisVRTE,
     mes: mes,
     ano: ano,
     ciNumero: ciNum
@@ -672,8 +703,19 @@ function _exportarXLSXImpl(st, ExcelJS) {
   ws.getColumn(5).width = 11;  // NF
   for (var c = 6; c <= totalCols; c++) ws.getColumn(c).width = 5;
 
+  // ─── Tabela-resumo ISEO/VRTE ───
+  var rowResumoStart = rowDataStart + st.mils.length + 2;
+  var rowResumoEnd = _renderResumoIseo(ws, st, rowResumoStart, fnt);
+
+  // ─── "Respeitosamente," (alinhado à esquerda) ───
+  var rowResp = rowResumoEnd + 2;
+  ws.getCell('A' + rowResp).value = 'Respeitosamente,';
+  ws.getCell('A' + rowResp).font = fnt({ size: 11 });
+  ws.getCell('A' + rowResp).alignment = { horizontal: 'left' };
+  ws.mergeCells('A' + rowResp + ':' + lastCol + rowResp);
+
   // ─── Rodapé: assinatura + destinatário ───
-  var rowAss = rowDataStart + st.mils.length + 2;
+  var rowAss = rowResp + 2;
   var assinante = (APP.assinantes && APP.assinantes[0]) || {};
   var nomeAss = assinante.nome || 'COMANDANTE DA 1ª CIA/8º BPM';
   var rgAss   = assinante.rg   || '';
@@ -725,6 +767,115 @@ function _exportarXLSXImpl(st, ExcelJS) {
   }).catch(function(err) {
     console.error('[exportarXLSX] erro:', err);
     alert('Erro ao gerar XLSX: ' + (err.message || err));
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// _renderResumoIseo — Tabela final com totais por categoria
+// ═══════════════════════════════════════════════════════════════
+//
+// Layout (4 linhas + 1 header):
+//
+//                            | RURAL  | F. PRES. 08 HRS | F. PRES. 12 HRS
+//   QTD ISEO EXECUTADA       |  56    |   164           |   (vazio)
+//   QTD ISEO RECEBIDA        |  56    |   164           |   (vazio)
+//   SALDO DE ISEO            |   0    |    0            |   (vazio)
+//   QTD VRTE   |   22000     | 5600   |  16400          |   (vazio)
+//
+// Retorna a linha final (para o resto do rodapé continuar abaixo).
+// ═══════════════════════════════════════════════════════════════
+function _renderResumoIseo(ws, st, startRow, fnt) {
+  var combs = st.combinacoes || [];
+  if (!combs.length) return startRow - 1;
+
+  // Layout colunas:
+  //  A: (mesclada A:D) → label
+  //  E: total geral (só para linha QTD VRTE; vazio nas outras)
+  //  F+: uma coluna por combinação
+  var colLabel = 1; // A
+  var colLabelEnd = 4; // D — label vai ocupar A:D mesclado
+  var colTotal = 5; // E
+  var colCatStart = 6; // F
+
+  var rHdr  = startRow;
+  var rExec = startRow + 1;
+  var rRec  = startRow + 2;
+  var rSld  = startRow + 3;
+  var rVrte = startRow + 4;
+
+  // ─── Cabeçalho: categorias ───
+  // Coluna A:D vazia, E vazia, F+ com labels (RURAL, F. PRES. 08 HRS, etc)
+  combs.forEach(function(c, i) {
+    var col = colCatStart + i;
+    var cell = ws.getCell(rHdr, col);
+    cell.value = _categoriaLabelCurto(c.label) + ' ' + String(c.horas).padStart(2,'0') + ' HRS';
+    // COLHEITA mostra apenas "RURAL" sem horas (igual ao modelo)
+    if (_categoriaLabelCurto(c.label) === 'RURAL') {
+      cell.value = 'RURAL';
+    }
+    cell.font = fnt({ bold: true, size: 10 });
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.fill = _fill(_corCategoriaHex(c.label));
+    cell.border = _border();
+  });
+
+  // ─── Linha 1: QUANTIDADE DE ISEO EXECUTADA (fundo amarelo) ───
+  _resumoLinha(ws, rExec, colLabel, colLabelEnd, colTotal, colCatStart,
+    'QUANTIDADE DE ISEO EXECUTADA', '', combs.map(function(c) { return st.totaisISEO[c.key] || 0; }),
+    'FFF59D', fnt);
+
+  // ─── Linha 2: QUANTIDADE DE ISEO RECEBIDA (fundo ciano) ───
+  // Por padrão = EXECUTADA (usuário pode editar manualmente o XLSX se diferir)
+  _resumoLinha(ws, rRec, colLabel, colLabelEnd, colTotal, colCatStart,
+    'QUANTIDADE DE ISEO RECEBIDA', '', combs.map(function(c) { return st.totaisISEO[c.key] || 0; }),
+    '7ED3F7', fnt);
+
+  // ─── Linha 3: SALDO DE ISEO (fundo branco) ───
+  _resumoLinha(ws, rSld, colLabel, colLabelEnd, colTotal, colCatStart,
+    'SALDO DE ISEO', '', combs.map(function() { return 0; }),
+    'FFFFFF', fnt);
+
+  // ─── Linha 4: QUANTIDADE DE VRTE (fundo branco, com TOTAL na col E) ───
+  var totalVrteGeral = combs.reduce(function(s, c) { return s + (st.totaisVRTE[c.key] || 0); }, 0);
+  _resumoLinha(ws, rVrte, colLabel, colLabelEnd, colTotal, colCatStart,
+    'QUANTIDADE DE VRTE', totalVrteGeral, combs.map(function(c) { return st.totaisVRTE[c.key] || 0; }),
+    'FFFFFF', fnt);
+
+  return rVrte;
+}
+
+// Helper: renderiza UMA linha da tabela-resumo
+function _resumoLinha(ws, row, colLabel, colLabelEnd, colTotal, colCatStart, label, totalVal, valoresPorComb, bgHex, fnt) {
+  // Label em colunas A:D mescladas
+  var iniLetra = _colLetra(colLabel);
+  var fimLetra = _colLetra(colLabelEnd);
+  ws.mergeCells(iniLetra + row + ':' + fimLetra + row);
+  var cellLabel = ws.getCell(iniLetra + row);
+  cellLabel.value = label;
+  cellLabel.font = fnt({ bold: true, size: 10 });
+  cellLabel.alignment = { horizontal: 'center', vertical: 'middle' };
+  cellLabel.fill = _fill(bgHex);
+  cellLabel.border = _border();
+  // Aplicar borda nas células mescladas (D fica sem borda direita visualmente)
+  for (var c = colLabel; c <= colLabelEnd; c++) {
+    var cc = ws.getCell(row, c);
+    cc.border = _border();
+  }
+
+  // Total geral (col E) — só preenche se totalVal não for vazio
+  var cellTot = ws.getCell(row, colTotal);
+  cellTot.value = (totalVal === '' || totalVal === null || totalVal === undefined) ? null : totalVal;
+  cellTot.font = fnt({ bold: true, size: 10 });
+  cellTot.alignment = { horizontal: 'center', vertical: 'middle' };
+  cellTot.border = _border();
+
+  // Valores por combinação (F+)
+  valoresPorComb.forEach(function(v, i) {
+    var cell = ws.getCell(row, colCatStart + i);
+    cell.value = v;
+    cell.font = fnt({ bold: true, size: 10, color: { argb: 'FFC00000' } }); // vermelho-PMES
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.border = _border();
   });
 }
 
