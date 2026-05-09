@@ -162,6 +162,36 @@ function _coletarDadosMes(escs, mes, ano) {
   };
 }
 
+// VRTE por ISEO conforme a duração (igual a VM em db.js)
+var _VRTE_POR_HORA = { 6: 80, 8: 100, 12: 120 };
+
+// Identifica a operação canônica a partir de um tipoOp livre
+// (Aceita "Colheita", "OPERAÇÃO COLHEITA", "Força e Presença", etc.)
+function _opCanonicaFromTipoOp(tipoOp) {
+  var u = String(tipoOp || '').toUpperCase();
+  if (u.indexOf('COLHEITA') !== -1)         return 'COLHEITA';
+  if (u.indexOf('FORÇA E PRESENÇA') !== -1) return 'FORÇA E PRESENÇA';
+  if (u.indexOf('FORÇA TOTAL') !== -1)      return 'FORÇA TOTAL';
+  if (u.indexOf('VERÃO') !== -1)            return 'VERÃO';
+  return null;
+}
+
+// Soma das ENTRADAS de VRTE no mês, agrupadas por operação canônica
+// (Estorno e Ajuste não somam — são ignorados)
+function _coletarEntradasVRTE(vrteHist, mes, ano) {
+  var por = {};
+  (vrteHist || []).forEach(function(h) {
+    if (!h || h.tipo !== 'entrada') return;
+    if (!h.data) return;
+    var d = new Date(h.data + 'T12:00:00');
+    if (d.getMonth() !== mes || d.getFullYear() !== ano) return;
+    var canon = _opCanonicaFromTipoOp(h.tipoOp || h.ref);
+    if (!canon) return;
+    por[canon] = (por[canon] || 0) + (parseInt(h.qtd, 10) || 0);
+  });
+  return por;
+}
+
 // Label curto da categoria para a tabela-resumo final
 function _categoriaLabelCurto(label) {
   var u = String(label || '').toUpperCase();
@@ -270,12 +300,17 @@ function gerarPreviewRelatorio() {
     return;
   }
 
+  // Entradas de VRTE no mês (para calcular ISEO RECEBIDA)
+  var vrteHist = (APP.vrte && (APP.vrte.hist || APP.vrte.historico)) || [];
+  var entradasVRTEPorOp = _coletarEntradasVRTE(vrteHist, mes, ano);
+
   window._RELATORIO_STATE = {
     mils: mils,
     combinacoes: dados.combinacoes,
     porMilitar: dados.porMilitar,
     totaisISEO: dados.totaisISEO,
     totaisVRTE: dados.totaisVRTE,
+    entradasVRTEPorOp: entradasVRTEPorOp,
     mes: mes,
     ano: ano,
     ciNumero: ciNum
@@ -814,20 +849,34 @@ function _renderResumoIseo(ws, st, startRow, fnt) {
     cell.border = _border();
   });
 
+  // ─── Calcula valores RECEBIDA e SALDO por combinação ───
+  // RECEBIDA = (entradas de VRTE da operação no mês) ÷ (VRTE por ISEO da duração)
+  // SALDO    = RECEBIDA - EXECUTADA
+  var entradasOp = st.entradasVRTEPorOp || {};
+  var executadaPorComb = combs.map(function(c) { return st.totaisISEO[c.key] || 0; });
+  var recebidaPorComb = combs.map(function(c) {
+    var canonOp = _opCanonicaFromTipoOp(c.op) || c.op;
+    var vrteRecebido = entradasOp[canonOp] || 0;
+    var vrtePorISEO = _VRTE_POR_HORA[c.horas] || 100;
+    return Math.round(vrteRecebido / vrtePorISEO);
+  });
+  var saldoPorComb = combs.map(function(c, i) {
+    return recebidaPorComb[i] - executadaPorComb[i];
+  });
+
   // ─── Linha 1: QUANTIDADE DE ISEO EXECUTADA (fundo amarelo) ───
   _resumoLinha(ws, rExec, colLabel, colLabelEnd, colTotal, colCatStart,
-    'QUANTIDADE DE ISEO EXECUTADA', '', combs.map(function(c) { return st.totaisISEO[c.key] || 0; }),
+    'QUANTIDADE DE ISEO EXECUTADA', '', executadaPorComb,
     'FFF59D', fnt);
 
   // ─── Linha 2: QUANTIDADE DE ISEO RECEBIDA (fundo ciano) ───
-  // Por padrão = EXECUTADA (usuário pode editar manualmente o XLSX se diferir)
   _resumoLinha(ws, rRec, colLabel, colLabelEnd, colTotal, colCatStart,
-    'QUANTIDADE DE ISEO RECEBIDA', '', combs.map(function(c) { return st.totaisISEO[c.key] || 0; }),
+    'QUANTIDADE DE ISEO RECEBIDA', '', recebidaPorComb,
     '7ED3F7', fnt);
 
   // ─── Linha 3: SALDO DE ISEO (fundo branco) ───
   _resumoLinha(ws, rSld, colLabel, colLabelEnd, colTotal, colCatStart,
-    'SALDO DE ISEO', '', combs.map(function() { return 0; }),
+    'SALDO DE ISEO', '', saldoPorComb,
     'FFFFFF', fnt);
 
   // ─── Linha 4: QUANTIDADE DE VRTE (fundo branco, com TOTAL na col E) ───
