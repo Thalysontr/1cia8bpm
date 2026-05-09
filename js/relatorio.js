@@ -163,10 +163,9 @@ function _coletarDadosMes(escs, mes, ano) {
 }
 
 // Label curto da categoria para a tabela-resumo final
-// COLHEITA → "RURAL"; FORÇA E PRESENÇA → "F. PRES."; etc.
 function _categoriaLabelCurto(label) {
   var u = String(label || '').toUpperCase();
-  if (u === 'COLHEITA')          return 'RURAL';
+  if (u === 'COLHEITA')          return 'COLHEITA';
   if (u === 'FORÇA E PRESENÇA')  return 'F. PRES.';
   if (u === 'FORÇA TOTAL')       return 'F. TOTAL';
   if (u === 'VERÃO')             return 'VERÃO';
@@ -809,10 +808,6 @@ function _renderResumoIseo(ws, st, startRow, fnt) {
     var col = colCatStart + i;
     var cell = ws.getCell(rHdr, col);
     cell.value = _categoriaLabelCurto(c.label) + ' ' + String(c.horas).padStart(2,'0') + ' HRS';
-    // COLHEITA mostra apenas "RURAL" sem horas (igual ao modelo)
-    if (_categoriaLabelCurto(c.label) === 'RURAL') {
-      cell.value = 'RURAL';
-    }
     cell.font = fnt({ bold: true, size: 10 });
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
     cell.fill = _fill(_corCategoriaHex(c.label));
