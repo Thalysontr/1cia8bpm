@@ -452,8 +452,14 @@ function _exportarXLSXImpl(st, ExcelJS) {
   wb.created = new Date();
 
   var ws = wb.addWorksheet('Relatório', {
-    pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 }
+    pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
+    properties: { defaultRowHeight: 18 }
   });
+
+  // Helper: aplica Arial e tamanho padrão preservando outros atributos
+  function fnt(extra) {
+    return Object.assign({ name: 'Arial', size: 10 }, extra || {});
+  }
 
   var grupos = _agruparPorCategoria(st.combinacoes);
   var maxDias = _calcMaxDias(st.porMilitar, st.mils, st.combinacoes);
@@ -469,7 +475,32 @@ function _exportarXLSXImpl(st, ExcelJS) {
   var hoje = new Date();
   var dataExtensa = hoje.getDate() + ' de ' + nomesMeses[hoje.getMonth()].toLowerCase() + ' de ' + hoje.getFullYear();
 
-  // ─── Cabeçalho institucional (linhas 1-4) ───
+  // ─── LOGOS (PMES esquerda + 8º BPM direita) ───
+  // Carregadas do logos.js (já incluso em index.html)
+  try {
+    if (typeof LOGO_PMES_B64 !== 'undefined' && LOGO_PMES_B64) {
+      var imgPmes = wb.addImage({ base64: LOGO_PMES_B64, extension: 'png' });
+      ws.addImage(imgPmes, {
+        tl:  { col: 0.1,  row: 0.1 },
+        ext: { width: 75, height: 90 }
+      });
+    }
+    if (typeof LOGO_8BPM_B64 !== 'undefined' && LOGO_8BPM_B64) {
+      var imgBpm = wb.addImage({ base64: LOGO_8BPM_B64, extension: 'png' });
+      // Ancorar próximo do canto direito — usar última coluna - 0.5
+      ws.addImage(imgBpm, {
+        tl:  { col: Math.max(totalCols - 1.2, 6), row: 0.1 },
+        ext: { width: 75, height: 90 }
+      });
+    }
+  } catch (e) {
+    console.warn('[relatorio] erro carregando logos:', e);
+  }
+
+  // Reserva altura das primeiras linhas para acomodar as logos
+  for (var rh = 1; rh <= 4; rh++) ws.getRow(rh).height = 22;
+
+  // ─── Cabeçalho institucional (linhas 1-4) — texto centralizado ───
   var linhas = [
     'GOVERNO DO ESTADO DO ESPÍRITO SANTO',
     'POLÍCIA MILITAR',
@@ -479,32 +510,60 @@ function _exportarXLSXImpl(st, ExcelJS) {
   linhas.forEach(function(txt, i) {
     var row = ws.getRow(i + 1);
     row.getCell(1).value = txt;
-    row.getCell(1).font = { bold: i < 3, italic: i === 3, size: i < 3 ? 12 : 10 };
+    row.getCell(1).font = fnt({ bold: i < 3, italic: i === 3, size: i < 3 ? 12 : 10 });
     row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
     ws.mergeCells('A' + (i+1) + ':' + lastCol + (i+1));
   });
 
-  // Linha 5: vazia
-  // Linha 6: Número CI
+  // Linha 5: vazia (separador visual)
+  ws.getRow(5).height = 8;
+
+  // Linha 6: Número CI (esquerda) — em negrito
   ws.getCell('A6').value = 'CI/PMES/4º CPOR/8º BPM/1ª CIA/Nº ' + st.ciNumero;
-  ws.getCell('A6').font = { bold: true, size: 11 };
+  ws.getCell('A6').font = fnt({ bold: true, size: 11 });
+  ws.getCell('A6').alignment = { horizontal: 'left' };
   ws.mergeCells('A6:' + lastCol + '6');
 
-  // Linha 7: Data
+  // Linha 7: Data alinhada à direita
   ws.getCell('A7').value = 'Colatina – ES, ' + dataExtensa + '.';
+  ws.getCell('A7').font = fnt({ size: 11 });
   ws.getCell('A7').alignment = { horizontal: 'right' };
   ws.mergeCells('A7:' + lastCol + '7');
 
+  // Linha 8: vazia
+  ws.getRow(8).height = 8;
+
   // Linha 9: "Senhor Subcomandante,"
   ws.getCell('A9').value = 'Senhor Subcomandante,';
+  ws.getCell('A9').font = fnt({ size: 11 });
+  ws.getCell('A9').alignment = { horizontal: 'left' };
   ws.mergeCells('A9:' + lastCol + '9');
 
-  // Linhas 11-12: texto introdutório
-  ws.getCell('A11').value = 'Encaminho a Vossa Senhoria para análise e posterior deliberação, o relatório de escala ISEO referente ao mês de';
+  // Linha 10: vazia
+  ws.getRow(10).height = 8;
+
+  // Linha 11-12: texto introdutório com mês em negrito (rich text)
+  ws.getCell('A11').value = {
+    richText: [
+      { text: 'Encaminho a Vossa Senhoria para análise e posterior deliberação, o relatório de escala ISEO referente ao mês de ', font: fnt({ size: 11 }) }
+    ]
+  };
+  ws.getCell('A11').alignment = { horizontal: 'left', wrapText: true };
   ws.mergeCells('A11:' + lastCol + '11');
-  ws.getCell('A12').value = nomeMes + ' de ' + st.ano + ' na área da 1ª Cia/8º BPM, a saber:';
-  ws.getCell('A12').font = { bold: true };
+
+  ws.getCell('A12').value = {
+    richText: [
+      { text: nomeMes, font: fnt({ size: 11, bold: true }) },
+      { text: ' de ' + st.ano + ' na área da ', font: fnt({ size: 11 }) },
+      { text: '1ª Cia/8º BPM', font: fnt({ size: 11, bold: true }) },
+      { text: ', a saber:', font: fnt({ size: 11 }) }
+    ]
+  };
+  ws.getCell('A12').alignment = { horizontal: 'left' };
   ws.mergeCells('A12:' + lastCol + '12');
+
+  // Linha 13: vazia (separa do cabeçalho da tabela)
+  ws.getRow(13).height = 8;
 
   // ─── Tabela: linha 14 = categorias, 15 = subcategorias, 16 = headers, 17+ = dados ───
   var rowCat = 14;
@@ -522,7 +581,7 @@ function _exportarXLSXImpl(st, ExcelJS) {
     var cellCat = ws.getCell(iniCol + rowCat);
     cellCat.value = g.label;
     cellCat.alignment = { horizontal: 'center', vertical: 'middle' };
-    cellCat.font = { bold: true, size: 11 };
+    cellCat.font = fnt({ bold: true, size: 11 });
     cellCat.fill = _fill(_corCategoriaHex(g.label));
     cellCat.border = _border();
     colAtual += totalGrp;
@@ -539,30 +598,30 @@ function _exportarXLSXImpl(st, ExcelJS) {
       var cellSub = ws.getCell(iniCol + rowSub);
       cellSub.value = String(c.horas).padStart(2, '0') + ' HRS';
       cellSub.alignment = { horizontal: 'center', vertical: 'middle' };
-      cellSub.font = { bold: true, size: 10 };
+      cellSub.font = fnt({ bold: true, size: 10 });
       cellSub.fill = _fill(_corCategoriaHex(g.label));
       cellSub.border = _border();
       colAtual += n;
     });
   });
 
-  // Cabeçalho de colunas (linha rowHdr)
+  // Cabeçalho de colunas (linha rowHdr) — todas em NEGRITO
   var headers = ['ORDEM', 'POSTO/GRAD.', 'NOME COMPLETO', 'RG', 'NF'];
   headers.forEach(function(h, i) {
     var c = ws.getCell(rowHdr, i + 1);
     c.value = h;
-    c.font = { bold: true, size: 10 };
+    c.font = fnt({ bold: true, size: 10 });
     c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     c.fill = _fill('EEEEEE');
     c.border = _border();
   });
-  // "DIA" repetido para cada combinação
+  // "DIA" repetido para cada combinação — também em NEGRITO
   var colDia = 6;
   st.combinacoes.forEach(function(c) {
     for (var i = 0; i < maxDias[c.key]; i++) {
       var cell = ws.getCell(rowHdr, colDia);
       cell.value = 'DIA';
-      cell.font = { bold: true, size: 10 };
+      cell.font = fnt({ bold: true, size: 10 });
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
       cell.fill = _fill(_corCategoriaHex(c.label));
       cell.border = _border();
@@ -570,12 +629,12 @@ function _exportarXLSXImpl(st, ExcelJS) {
     }
   });
 
-  // Linhas dos militares
+  // Linhas dos militares (todas as células em Arial)
   st.mils.forEach(function(m, idx) {
     var r = rowDataStart + idx;
     ws.getCell(r, 1).value = idx + 1;
     ws.getCell(r, 2).value = m.posto || '';
-    // Nome com nome de guerra em negrito (rich text)
+    // Nome com nome de guerra em negrito (rich text já preserva Arial)
     ws.getCell(r, 3).value = _nomeRichText(m);
     ws.getCell(r, 4).value = m.rg || '';
     ws.getCell(r, 5).value = m.nf || '';
@@ -584,12 +643,12 @@ function _exportarXLSXImpl(st, ExcelJS) {
       var cell = ws.getCell(r, ci);
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
       cell.border = _border();
-      cell.font = { size: 10 };
+      cell.font = fnt({ size: 10 });
     });
     ws.getCell(r, 3).alignment = { horizontal: 'left', vertical: 'middle' };
     ws.getCell(r, 3).border = _border();
 
-    // Dias por combinação
+    // Dias por combinação — em NEGRITO (igual ao modelo)
     var bucket = st.porMilitar[m.rg] || {};
     var col = 6;
     st.combinacoes.forEach(function(c) {
@@ -599,7 +658,7 @@ function _exportarXLSXImpl(st, ExcelJS) {
         cell.value = dias[i] !== undefined ? dias[i] : null;
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
         cell.border = _border();
-        cell.font = { size: 10, bold: true };
+        cell.font = fnt({ size: 10, bold: true });
         col++;
       }
     });
@@ -621,29 +680,33 @@ function _exportarXLSXImpl(st, ExcelJS) {
   var cargoAss = assinante.cargo || 'COMANDANTE DA 1ª CIA/8º BPM';
 
   ws.getCell('A' + rowAss).value = nomeAss;
-  ws.getCell('A' + rowAss).font = { bold: true, size: 11 };
+  ws.getCell('A' + rowAss).font = fnt({ bold: true, size: 11 });
   ws.getCell('A' + rowAss).alignment = { horizontal: 'center' };
   ws.mergeCells('A' + rowAss + ':' + lastCol + rowAss);
 
   ws.getCell('A' + (rowAss+1)).value = rgAss;
+  ws.getCell('A' + (rowAss+1)).font = fnt({ size: 10 });
   ws.getCell('A' + (rowAss+1)).alignment = { horizontal: 'center' };
   ws.mergeCells('A' + (rowAss+1) + ':' + lastCol + (rowAss+1));
 
   ws.getCell('A' + (rowAss+2)).value = cargoAss;
+  ws.getCell('A' + (rowAss+2)).font = fnt({ size: 10 });
   ws.getCell('A' + (rowAss+2)).alignment = { horizontal: 'center' };
   ws.mergeCells('A' + (rowAss+2) + ':' + lastCol + (rowAss+2));
 
   // Destinatário (3 linhas vazias depois)
   var rowDest = rowAss + 6;
   ws.getCell('A' + rowDest).value = 'Ao Senhor,';
+  ws.getCell('A' + rowDest).font = fnt({ size: 11 });
   ws.mergeCells('A' + rowDest + ':' + lastCol + rowDest);
   ws.getCell('A' + (rowDest+1)).value = 'GLADSTON CUNHA – MAJ QOCPM';
-  ws.getCell('A' + (rowDest+1)).font = { bold: true };
+  ws.getCell('A' + (rowDest+1)).font = fnt({ bold: true, size: 11 });
   ws.mergeCells('A' + (rowDest+1) + ':' + lastCol + (rowDest+1));
   ws.getCell('A' + (rowDest+2)).value = 'Subcomandante e Chefe da Divisão Operacional do 8º Batalhão';
+  ws.getCell('A' + (rowDest+2)).font = fnt({ size: 11 });
   ws.mergeCells('A' + (rowDest+2) + ':' + lastCol + (rowDest+2));
   ws.getCell('A' + (rowDest+3)).value = 'Endereço: Rua Pedro Epichim, nº 68, Colatina Velha, Colatina/ES, CEP 29.700-023';
-  ws.getCell('A' + (rowDest+3)).font = { size: 9, italic: true };
+  ws.getCell('A' + (rowDest+3)).font = fnt({ size: 9, italic: true });
   ws.mergeCells('A' + (rowDest+3) + ':' + lastCol + (rowDest+3));
 
   // ─── Salvar e disparar download ───
@@ -690,17 +753,19 @@ function _colLetra(n) {
   return s;
 }
 
-// Nome com nome de guerra em negrito como rich text para ExcelJS
+// Nome com nome de guerra em negrito como rich text para ExcelJS (Arial)
 function _nomeRichText(m) {
   var nome = m.nome || '';
   var ng = (m.nomeGuerra || '').trim();
-  if (!ng) return nome;
+  var fontReg  = { name: 'Arial', size: 10 };
+  var fontBold = { name: 'Arial', size: 10, bold: true };
+  if (!ng) return { richText: [{ text: nome, font: fontReg }] };
   var idx = nome.toLowerCase().indexOf(ng.toLowerCase());
   if (idx === -1) {
     return {
       richText: [
-        { text: ng + ' ', font: { bold: true, size: 10 } },
-        { text: nome, font: { size: 10 } }
+        { text: ng + ' ', font: fontBold },
+        { text: nome, font: fontReg }
       ]
     };
   }
@@ -708,8 +773,8 @@ function _nomeRichText(m) {
   var negrito = nome.substring(idx, idx + ng.length);
   var depois = nome.substring(idx + ng.length);
   var parts = [];
-  if (antes) parts.push({ text: antes, font: { size: 10 } });
-  parts.push({ text: negrito, font: { bold: true, size: 10 } });
-  if (depois) parts.push({ text: depois, font: { size: 10 } });
+  if (antes) parts.push({ text: antes, font: fontReg });
+  parts.push({ text: negrito, font: fontBold });
+  if (depois) parts.push({ text: depois, font: fontReg });
   return { richText: parts };
 }
