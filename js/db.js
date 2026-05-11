@@ -22,6 +22,34 @@ var _CACHE = {
   anexo:      null
 };
 
+// ─── BLINDAGEM: remove campos `undefined` recursivamente ────────
+// O Firestore rejeita `undefined` em qualquer campo com o erro:
+//   "Function DocumentReference.set() called with invalid data.
+//    Unsupported field value: undefined"
+// Esta função sanitiza qualquer payload antes do .set() / .update().
+// `null` é mantido (Firestore aceita). Arrays e objetos são percorridos.
+function _stripUndefined(value) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (Array.isArray(value)) {
+    return value
+      .map(_stripUndefined)
+      .filter(function(v) { return v !== undefined; });
+  }
+  if (typeof value === 'object' && value.constructor === Object) {
+    var out = {};
+    Object.keys(value).forEach(function(k) {
+      var clean = _stripUndefined(value[k]);
+      if (clean !== undefined) out[k] = clean;
+    });
+    return out;
+  }
+  return value; // string, number, boolean, Date, Firestore Timestamp etc.
+}
+
+// Expor para testes/uso externo
+window._stripUndefined = _stripUndefined;
+
 // ─── DB: interface assíncrona via Firestore ─────────────────────
 var DB = {
 
@@ -38,7 +66,7 @@ var DB = {
 
   saveMil: function(mil, cb) {
     var docId = mil.rg.replace(/\./g,'').replace(/-/g,'');
-    FBDB.collection('mils').doc(docId).set(mil).then(function() {
+    FBDB.collection('mils').doc(docId).set(_stripUndefined(mil)).then(function() {
       _CACHE.mils = null; // limpa cache
       if (cb) cb();
     });
@@ -54,7 +82,7 @@ var DB = {
 
   updateMilHist: function(rg, hist, cb) {
     var docId = rg.replace(/\./g,'').replace(/-/g,'');
-    FBDB.collection('mils').doc(docId).update({ hist: hist }).then(function() {
+    FBDB.collection('mils').doc(docId).update({ hist: _stripUndefined(hist) }).then(function() {
       _CACHE.mils = null;
       if (cb) cb();
     });
@@ -76,7 +104,7 @@ var DB = {
         ];
         var batch = FBDB.batch();
         defaults.forEach(function(op) {
-          batch.set(FBDB.collection('ops').doc(op.id), op);
+          batch.set(FBDB.collection('ops').doc(op.id), _stripUndefined(op));
         });
         batch.commit().then(function() {
           _CACHE.ops = defaults;
@@ -91,7 +119,7 @@ var DB = {
 
   saveOp: function(op, cb) {
     var docId = 'op' + op.id;
-    FBDB.collection('ops').doc(docId).set(op).then(function() {
+    FBDB.collection('ops').doc(docId).set(_stripUndefined(op)).then(function() {
       _CACHE.ops = null;
       if (cb) cb();
     });
@@ -116,7 +144,7 @@ var DB = {
   },
 
   saveEsc: function(esc, cb) {
-    FBDB.collection('escalas').doc(String(esc.id)).set(esc).then(function() {
+    FBDB.collection('escalas').doc(String(esc.id)).set(_stripUndefined(esc)).then(function() {
       _CACHE.escs = null;
       if (cb) cb();
     });
@@ -140,7 +168,7 @@ var DB = {
   },
 
   saveVrte: function(vrte, cb) {
-    FBDB.collection('config').doc('vrte').set(vrte).then(function() {
+    FBDB.collection('config').doc('vrte').set(_stripUndefined(vrte)).then(function() {
       _CACHE.vrte = vrte;
       if (cb) cb();
     });
@@ -167,7 +195,7 @@ var DB = {
         var entry = Object.assign({}, mov, { saldoApos: novoSaldo });
         hist.push(entry);
         var updated = { saldo: novoSaldo, hist: hist, historico: hist };
-        t.set(ref, updated);
+        t.set(ref, _stripUndefined(updated));
         return updated;
       });
     }).then(function(updated) {
@@ -200,7 +228,7 @@ var DB = {
           h.saldoApos = saldo;
         });
         var updated = { saldo: saldo, hist: ordenado, historico: ordenado };
-        t.set(ref, updated);
+        t.set(ref, _stripUndefined(updated));
         return updated;
       });
     }).then(function(updated) {
@@ -223,7 +251,7 @@ var DB = {
   },
 
   saveUsers: function(users, cb) {
-    FBDB.collection('config').doc('usuarios').set({list: users}).then(function() {
+    FBDB.collection('config').doc('usuarios').set(_stripUndefined({list: users})).then(function() {
       _CACHE.users = users;
       if (cb) cb();
     });
@@ -242,7 +270,7 @@ var DB = {
   },
 
   saveAssinantes: function(list, cb) {
-    FBDB.collection('config').doc('assinantes').set({list: list}).then(function() {
+    FBDB.collection('config').doc('assinantes').set(_stripUndefined({list: list})).then(function() {
       _CACHE.assinantes = list;
       if (cb) cb();
     });
@@ -265,7 +293,7 @@ var DB = {
   saveDisp: function(disp, cb) {
     // usa edocs como ID do documento — garante idempotência
     var docId = String(disp.edocs || disp.id || Date.now());
-    FBDB.collection('dispensas').doc(docId).set(disp).then(function() {
+    FBDB.collection('dispensas').doc(docId).set(_stripUndefined(disp)).then(function() {
       _CACHE.disps = null;
       if (cb) cb();
     });
@@ -296,7 +324,7 @@ var DB = {
       // Seed único a partir do arquivo local não rastreado (seed_data.js)
       var seed = (typeof window !== 'undefined' && window._SEED_ANEXO_VISITAS) ? window._SEED_ANEXO_VISITAS : [];
       if (seed.length > 0) {
-        FBDB.collection('config').doc('anexo_visitas').set({ list: seed }).then(function() {
+        FBDB.collection('config').doc('anexo_visitas').set(_stripUndefined({ list: seed })).then(function() {
           _CACHE.anexo = seed.map(function(v) { return [v.n, v.c, v.e]; });
           cb(_CACHE.anexo);
         });
@@ -312,7 +340,7 @@ var DB = {
     var normalized = list.map(function(v) {
       return Array.isArray(v) ? {n: v[0], c: v[1], e: v[2]} : v;
     });
-    FBDB.collection('config').doc('anexo_visitas').set({ list: normalized }).then(function() {
+    FBDB.collection('config').doc('anexo_visitas').set(_stripUndefined({ list: normalized })).then(function() {
       _CACHE.anexo = list;
       if (cb) cb();
     });
