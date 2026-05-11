@@ -1023,7 +1023,7 @@ function salvarEsc() {
     cancelada: false,
     status:    'ativa',
     criadaEm:  isEdit ? (oldEsc && oldEsc.criadaEm) || new Date().toISOString() : new Date().toISOString(),
-    editadaEm: isEdit ? new Date().toISOString() : undefined
+    editadaEm: isEdit ? new Date().toISOString() : null
   };
 
   console.log('[salvarEsc] chamando DB.saveEsc com:', escala);
