@@ -354,14 +354,54 @@
 
       <!-- ESCALAS -->
       <div id="pe" class="panel">
-        <div class="ph"><div class="pt">Escalas geradas</div><div class="ps">Histórico completo</div></div>
-        <div class="card"><div class="ch" style="flex-wrap:wrap;gap:8px">
-            <span class="ct">Todas as escalas</span>
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--t2);cursor:pointer;user-select:none">
-              <input type="checkbox" id="escs-mostrar-canceladas" onchange="rEscs()" style="cursor:pointer"/>
-              Mostrar canceladas
-            </label>
+        <div class="ph"><div class="pt">Escalas geradas</div><div class="ps">Histórico completo com filtros</div></div>
+
+        <!-- Filtros -->
+        <div class="card">
+          <div class="ch"><span class="ct">Filtros</span>
+            <button class="btn bsm" onclick="limparFiltrosEscs()" style="margin-left:auto">× Limpar</button>
           </div>
+          <div class="fr3">
+            <div class="fg">
+              <label>Operação</label>
+              <select id="escs-f-op" onchange="rEscs()">
+                <option value="">Todas as operações</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label>Duração</label>
+              <select id="escs-f-dur" onchange="rEscs()">
+                <option value="">Todas as durações</option>
+                <option value="6">6h</option>
+                <option value="8">8h</option>
+                <option value="12">12h</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label>Mês de referência</label>
+              <input type="month" id="escs-f-mes" onchange="rEscs()"/>
+            </div>
+          </div>
+          <div class="fr3">
+            <div class="fg">
+              <label>Buscar (operação, município, militar)</label>
+              <input type="text" id="escs-f-q" placeholder="Digite para filtrar..." oninput="rEscs()"/>
+            </div>
+            <div class="fg" style="display:flex;align-items:flex-end">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--t2);cursor:pointer;user-select:none">
+                <input type="checkbox" id="escs-mostrar-canceladas" onchange="rEscs()" style="cursor:pointer"/>
+                Mostrar canceladas
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resumo / cards por operação -->
+        <div id="escs-resumo"></div>
+
+        <!-- Tabela de escalas -->
+        <div class="card">
+          <div class="ch"><span class="ct" id="escs-titulo">Todas as escalas</span></div>
           <div class="tw"><table><thead><tr><th>Data</th><th>Operação</th><th>Município</th><th>Dur.</th><th>VRTE</th><th>Militares</th><th>Ações</th></tr></thead><tbody id="etb"></tbody></table></div>
         </div>
       </div>

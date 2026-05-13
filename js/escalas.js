@@ -5,6 +5,45 @@
 // IDs do index.html: painel=#pe, tbody=#etb
 // ═══════════════════════════════════════════════════════════════
 
+// Helper — texto da escala usado pela busca textual (operação, município, militares)
+function _escSearchableText(e) {
+  var partes = [
+    e.operacao || '',
+    e.municipio || '',
+    (e.militares || []).map(function(m) {
+      return (m.nome || '') + ' ' + (m.nomeGuerra || '') + ' ' + (m.rg || '') + ' ' + (m.nf || '');
+    }).join(' ')
+  ];
+  return partes.join(' ').toLowerCase();
+}
+
+// Popula o dropdown de operações (uma vez, a partir das escalas atuais)
+function _popularFiltroOperacoes(todas) {
+  var sel = document.getElementById('escs-f-op');
+  if (!sel) return;
+  // Mantém a seleção atual
+  var atual = sel.value;
+  var ops = {};
+  todas.forEach(function(e) { if (e.operacao) ops[e.operacao] = true; });
+  var lista = Object.keys(ops).sort();
+  sel.innerHTML = '<option value="">Todas as operações</option>' +
+    lista.map(function(op) {
+      var sel = (op === atual) ? ' selected' : '';
+      return '<option value="' + esc(op) + '"' + sel + '>' + esc(op) + '</option>';
+    }).join('');
+}
+
+function limparFiltrosEscs() {
+  var ids = ['escs-f-op','escs-f-dur','escs-f-mes','escs-f-q'];
+  ids.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  var cb = document.getElementById('escs-mostrar-canceladas');
+  if (cb) cb.checked = false;
+  rEscs();
+}
+
 function rEscs() {
   var tb = document.getElementById('etb');
   if (!tb) {
@@ -16,28 +55,55 @@ function rEscs() {
     return (b.data || '').localeCompare(a.data || '');
   });
 
+  // Popula dropdown de operações (sempre, para refletir novas operações)
+  _popularFiltroOperacoes(todas);
+
+  // ─── Lê filtros ───
+  var fOp  = (document.getElementById('escs-f-op')  || {}).value || '';
+  var fDur = (document.getElementById('escs-f-dur') || {}).value || '';
+  var fMes = (document.getElementById('escs-f-mes') || {}).value || ''; // formato "YYYY-MM"
+  var fQ   = ((document.getElementById('escs-f-q')  || {}).value || '').trim().toLowerCase();
   var mostrarCanceladas = !!(document.getElementById('escs-mostrar-canceladas') || {}).checked;
 
-  var escs = mostrarCanceladas
-    ? todas
-    : todas.filter(function(e) { return !(e.cancelada === true || e.status === 'cancelada'); });
+  // ─── Aplica filtros ───
+  var ativas = todas.filter(function(e) { return !(e.cancelada === true || e.status === 'cancelada'); });
+  var qtdCanceladas = todas.length - ativas.length;
 
-  var qtdCanceladas = todas.length - todas.filter(function(e) {
-    return !(e.cancelada === true || e.status === 'cancelada');
-  }).length;
+  var base = mostrarCanceladas ? todas : ativas;
 
-  // Atualiza o label do checkbox com contagem
-  var lbl = document.querySelector('label[for="escs-mostrar-canceladas"]') ||
-            (document.getElementById('escs-mostrar-canceladas') || {}).parentElement;
-  if (lbl && qtdCanceladas > 0) {
-    var txt = lbl.lastChild;
-    if (txt && txt.nodeType === 3) txt.textContent = ' Mostrar canceladas (' + qtdCanceladas + ')';
+  var escs = base.filter(function(e) {
+    if (fOp && e.operacao !== fOp) return false;
+    if (fDur && String(e.duracao || '') !== fDur) return false;
+    if (fMes && String(e.data || '').slice(0, 7) !== fMes) return false;
+    if (fQ && _escSearchableText(e).indexOf(fQ) === -1) return false;
+    return true;
+  });
+
+  // Atualiza o label do checkbox com contagem total de canceladas
+  var lblCheck = (document.getElementById('escs-mostrar-canceladas') || {}).parentElement;
+  if (lblCheck) {
+    var txt = lblCheck.lastChild;
+    if (txt && txt.nodeType === 3) {
+      txt.textContent = qtdCanceladas > 0
+        ? ' Mostrar canceladas (' + qtdCanceladas + ')'
+        : ' Mostrar canceladas';
+    }
   }
 
+  // ─── Cards de resumo (por operação, considerando os filtros) ───
+  _renderEscsResumo(escs);
+
+  // Título da tabela com contagem do resultado
+  var titulo = document.getElementById('escs-titulo');
+  if (titulo) {
+    titulo.textContent = 'Resultado: ' + escs.length + ' escala' + (escs.length !== 1 ? 's' : '');
+  }
+
+  // ─── Renderiza tabela ───
   if (!escs.length) {
     var msg = !todas.length
       ? 'Nenhuma escala registrada.'
-      : (mostrarCanceladas ? 'Nenhuma escala encontrada.' : 'Nenhuma escala ativa. Marque "Mostrar canceladas" para ver as ' + qtdCanceladas + ' canceladas.');
+      : 'Nenhuma escala encontrada com os filtros aplicados.';
     tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:20px">' + msg + '</td></tr>';
     return;
   }
@@ -71,6 +137,73 @@ function rEscs() {
       '<td>' + acoes + '</td>' +
       '</tr>';
   }).join('');
+}
+
+// ─── Cards de resumo: total filtrado + por operação ─────────────
+function _renderEscsResumo(escs) {
+  var box = document.getElementById('escs-resumo');
+  if (!box) return;
+
+  if (!escs.length) {
+    box.innerHTML = '';
+    return;
+  }
+
+  // Agrupa por operação
+  var porOp = {};
+  var totalVrte = 0;
+  var totalMils = 0;
+  escs.forEach(function(e) {
+    var op = e.operacao || '—';
+    if (!porOp[op]) porOp[op] = { count: 0, vrte: 0, mils: 0 };
+    porOp[op].count++;
+    var v = parseInt(e.vrteTotal, 10) || 0;
+    var m = (e.militares && e.militares.length) || 0;
+    if (!(e.cancelada === true || e.status === 'cancelada')) {
+      porOp[op].vrte += v;
+      totalVrte += v;
+      porOp[op].mils += m;
+      totalMils += m;
+    }
+  });
+
+  var ops = Object.keys(porOp).sort();
+
+  // Card geral + um card por operação
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:10px">';
+
+  // Card "Total"
+  html += '<div style="background:var(--s2);border-radius:8px;padding:12px;border-left:4px solid var(--ac)">' +
+    '<div style="font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--t2);text-transform:uppercase">Total filtrado</div>' +
+    '<div style="font-size:24px;font-weight:800;color:var(--ac);line-height:1.2">' + escs.length + '</div>' +
+    '<div style="font-size:11px;color:var(--t2);margin-top:4px">' +
+      totalMils + ' militares · ' + totalVrte.toLocaleString('pt-BR') + ' VRTE' +
+    '</div></div>';
+
+  // Cards por operação
+  ops.forEach(function(op) {
+    var d = porOp[op];
+    var cor = _corOperacao(op);
+    html += '<div style="background:var(--s2);border-radius:8px;padding:12px;border-left:4px solid ' + cor + '">' +
+      '<div style="font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--t2);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(op) + '">' + esc(op) + '</div>' +
+      '<div style="font-size:24px;font-weight:800;color:' + cor + ';line-height:1.2">' + d.count + '</div>' +
+      '<div style="font-size:11px;color:var(--t2);margin-top:4px">' +
+        d.mils + ' militares · ' + d.vrte.toLocaleString('pt-BR') + ' VRTE' +
+      '</div></div>';
+  });
+
+  html += '</div>';
+  box.innerHTML = html;
+}
+
+// Cor por operação (similar ao usado em outros pontos do sistema)
+function _corOperacao(op) {
+  var u = String(op || '').toUpperCase();
+  if (u.indexOf('COLHEITA') !== -1)         return '#1a3a5c';
+  if (u.indexOf('FORÇA E PRESENÇA') !== -1) return '#2e7d32';
+  if (u.indexOf('FORÇA TOTAL') !== -1)      return '#6a1f6e';
+  if (u.indexOf('VERÃO') !== -1)            return '#b45309';
+  return '#555';
 }
 
 // ═══════════════════════════════════════════════════════════════
