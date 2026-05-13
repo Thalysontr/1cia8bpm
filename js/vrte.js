@@ -260,6 +260,11 @@ function rVRTE() {
   if (vd && !vd.value) vd.value = hoje.toISOString().split('T')[0];
 
   _renderOpBtns();
+
+  // Calendário ISEO (feature B)
+  if (typeof rCalendarioIseo === 'function') {
+    try { rCalendarioIseo(); } catch (e) { console.error('[rVRTE] erro no calendário:', e); }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════

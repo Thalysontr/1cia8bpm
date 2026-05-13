@@ -233,6 +233,24 @@
           <div class="tw"><table><thead><tr><th>Mês</th><th>Entradas</th><th>Saídas</th><th>Saldo do período</th></tr></thead><tbody id="v-tmeses"></tbody></table></div>
         </div>
 
+        <!-- Calendário ISEO — escalas + militares por dia -->
+        <div class="card" id="vrte-cal-card">
+          <div class="ch" style="flex-wrap:wrap;gap:8px">
+            <span class="ct">📅 Calendário ISEO</span>
+            <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
+              <button class="btn bsm" onclick="navegarCalIseo(-1)" title="Mês anterior">◀</button>
+              <span id="cal-iseo-titulo" style="font-weight:600;min-width:140px;text-align:center;font-size:13px"></span>
+              <button class="btn bsm" onclick="navegarCalIseo(1)" title="Próximo mês">▶</button>
+              <button class="btn bsm" onclick="navegarCalIseoHoje()" style="margin-left:4px">Hoje</button>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--t2);margin-bottom:8px">
+            Clique em um dia para ver detalhes das escalas e militares escalados.
+          </div>
+          <div id="cal-iseo-grid"></div>
+          <div id="cal-iseo-detalhes" style="margin-top:10px"></div>
+        </div>
+
         <!-- Registrar entrada (novo layout com botões de operação) -->
         <div class="card">
           <div class="ch"><span class="ct">Registrar entrada de VRTE</span></div>
@@ -566,6 +584,7 @@ var TMPL_B64="UEsDBBQAAAAIAIFdlVzJf3/HuAEAABMJAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbL
 <script src="js/relatorio.js"></script>
 <script src="js/patches.js"></script>
 <script src="js/vrte_painel_patch.js"></script>
+<script src="js/vrte_calendario.js"></script>
 
 </body>
 </html>
