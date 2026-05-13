@@ -778,8 +778,14 @@ function _municipioTurno(t, escalaMun) {
 function getEscData() {
   function v(id) { return (document.getElementById(id) || {}).value || ''; }
 
-  var op = v('eo');
-  if (op === '__outra__') op = v('eo-outro').trim();
+  // Fonte de VRTE — operação cadastrada de onde o VRTE será debitado
+  var opFonte = v('eo');
+  if (opFonte === '__outra__') opFonte = v('eo-outro').trim();
+
+  // Suboperação — nome que aparece no PDF/DOCX (texto livre)
+  // Se vazio, usa a fonte como nome no relatório (comportamento antigo)
+  var subop = v('eo-sub').trim();
+  var op = subop || opFonte;
 
   var mun = v('em');
   if (mun === '__outra__') mun = v('em-outro').trim();
@@ -794,20 +800,23 @@ function getEscData() {
   var ordemNum = inclOrdem ? v('ordem-num').trim() : '';
   var inclRotas = (document.getElementById('incl-rotas') || {}).checked;
 
-  var isColheita = /colheita/i.test(op);
+  // isColheita usa a FONTE (para decidir incluir determinações de Colheita)
+  var isColheita = /colheita/i.test(opFonte);
   var detsAtivas = _determinacoes.filter(function(d) {
     if (!d.incluir) return false;
     if (d.soColheita && !isColheita) return false;
     return true;
   }).map(function(d) {
-    // Substitui placeholder {OPERACAO} pelo nome real da operação (em caixa alta)
+    // Substitui placeholder {OPERACAO} pelo nome usado no relatório (em caixa alta)
     return Object.assign({}, d, {
       texto: (d.texto || '').replace(/\{OPERACAO\}/g, (op || '').toUpperCase())
     });
   });
 
   return {
-    operacao: op,
+    operacao: op,                  // nome no relatório (PDF/DOCX) — subop ou fonte
+    operacaoFonte: opFonte,        // fonte de VRTE (sempre a operação cadastrada)
+    suboperacao: subop || null,    // suboperação livre, se preenchida
     ordemNum: ordemNum,
     data: v('ed'),
     municipio: mun,
@@ -934,6 +943,7 @@ function limparEsc() {
   });
 
   var eo = document.getElementById('eo'); if (eo) eo.value = '';
+  var eoSub = document.getElementById('eo-sub'); if (eoSub) eoSub.value = '';
   var em = document.getElementById('em'); if (em) em.value = 'Colatina / ES';
   var edu = document.getElementById('edu'); if (edu) edu.value = '';
   var ed = document.getElementById('ed'); if (ed) ed.value = new Date().toISOString().split('T')[0];
@@ -1007,7 +1017,9 @@ function salvarEsc() {
 
   var escala = {
     id: id,
-    operacao:  d.operacao,
+    operacao:      d.operacao,           // nome no relatório (subop ou fonte)
+    operacaoFonte: d.operacaoFonte || d.operacao, // fonte de VRTE (compat: fallback)
+    suboperacao:   d.suboperacao || null,
     ordemNum:  d.ordemNum,
     data:      d.data,
     municipio: d.municipio,
@@ -1044,7 +1056,8 @@ function salvarEsc() {
         DB.addVrteMov({
           data: d.data,
           tipo: delta > 0 ? 'saida' : 'entrada',
-          tipoOp: delta > 0 ? d.operacao : 'Ajuste',
+          // Débito sempre usa a FONTE de VRTE; ajustes (entrada) marcam como "Ajuste"
+          tipoOp: delta > 0 ? (d.operacaoFonte || d.operacao) : 'Ajuste',
           qtd: Math.abs(delta),
           ref: 'Ajuste — edição da escala ' + d.operacao + ' (' + d.data + ')'
         }, function(updated, err) {
@@ -1056,9 +1069,11 @@ function salvarEsc() {
         DB.addVrteMov({
           data: d.data,
           tipo: 'saida',
-          tipoOp: d.operacao,
+          // Débito usa a FONTE de VRTE — assim o relatório/saldo agrupa pela operação cadastrada
+          tipoOp: d.operacaoFonte || d.operacao,
           qtd: d.vrteTotal,
-          ref: 'Escala — ' + d.operacao
+          // Ref preserva a suboperação para rastrear no histórico do VRTE
+          ref: 'Escala — ' + (d.operacao || d.operacaoFonte)
         }, function(updated, err) {
           if (err) console.error('[salvarEsc] falha ao debitar VRTE:', err);
           finalizarSalvar();
@@ -1087,6 +1102,7 @@ function salvarEsc() {
         initTurnos();
         _renderDeterminacoesContent();
         var eo = document.getElementById('eo'); if (eo) eo.value = '';
+        var eoSub = document.getElementById('eo-sub'); if (eoSub) eoSub.value = '';
         var edu = document.getElementById('edu'); if (edu) edu.value = '';
         var ordChk = document.getElementById('incl-ordem'); if (ordChk) ordChk.checked = false;
         var ordWrap = document.getElementById('ordem-num-wrap'); if (ordWrap) ordWrap.style.display = 'none';
@@ -1126,9 +1142,11 @@ function editarEscala(id) {
     var edu = document.getElementById('edu');
 
     if (eo) {
+      // A FONTE de VRTE — usa operacaoFonte se existir; fallback para operacao (escalas antigas)
+      var fonteCarregar = escala.operacaoFonte || escala.operacao;
       var found = false;
       for (var i = 0; i < eo.options.length; i++) {
-        if (eo.options[i].value === escala.operacao) { eo.value = escala.operacao; found = true; break; }
+        if (eo.options[i].value === fonteCarregar) { eo.value = fonteCarregar; found = true; break; }
       }
       if (!found && eo.options.length) {
         // operação não existe na lista — usa "Outra"
@@ -1136,8 +1154,17 @@ function editarEscala(id) {
         if (outroOpt) {
           eo.value = '__outra__';
           var eoOutro = document.getElementById('eo-outro');
-          if (eoOutro) { eoOutro.value = escala.operacao; eoOutro.style.display = ''; }
+          if (eoOutro) { eoOutro.value = fonteCarregar; eoOutro.style.display = ''; }
         }
+      }
+    }
+    // Suboperação (texto livre que aparece no PDF)
+    var eoSub = document.getElementById('eo-sub');
+    if (eoSub) {
+      eoSub.value = escala.suboperacao || '';
+      // Se a escala não tinha suboperacao mas tem operacao !== operacaoFonte, recuperar a diferença
+      if (!escala.suboperacao && escala.operacaoFonte && escala.operacao !== escala.operacaoFonte) {
+        eoSub.value = escala.operacao;
       }
     }
     if (ed)  ed.value  = escala.data || '';
@@ -1204,6 +1231,7 @@ function cancelarEdicao() {
   initTurnos();
   if (typeof _renderDeterminacoesContent === 'function') _renderDeterminacoesContent();
   var eo = document.getElementById('eo'); if (eo) eo.value = '';
+  var eoSub = document.getElementById('eo-sub'); if (eoSub) eoSub.value = '';
   var edu = document.getElementById('edu'); if (edu) edu.value = '';
   if (typeof nav === 'function') nav('escalas', null);
 }

@@ -318,13 +318,18 @@
         <div class="ph"><div class="pt">Nova escala ISEO</div><div class="ps">Preencha e gere o documento</div></div>
         <div class="card"><div class="ch"><span class="ct">1. Dados gerais</span></div>
           <div class="fr">
-            <div class="fg"><label>Operação (ISEO) <span style="color:var(--rd);font-weight:600">*</span></label>
-              <select id="eo" onchange="updVN();preencherMunOp();toggleOpOutra()"><option value="">— Selecione a operação —</option></select>
+            <div class="fg"><label>Fonte de VRTE (Operação ISEO) <span style="color:var(--rd);font-weight:600">*</span></label>
+              <select id="eo" onchange="updVN();preencherMunOp();toggleOpOutra()"><option value="">— Selecione de onde sai o VRTE —</option></select>
               <input type="text" id="eo-outro" placeholder="Descreva a operação" style="display:none;margin-top:6px" oninput="updVN()"/>
+              <div style="font-size:10px;color:var(--t2);margin-top:4px">O VRTE será debitado desta operação no controle.</div>
             </div>
-            <div class="fg"><label>Data da escala</label><input type="date" id="ed"/></div>
+            <div class="fg"><label>Suboperação (nome no relatório)</label>
+              <input type="text" id="eo-sub" placeholder="Ex: Policiamento Festa de Marilândia (deixe vazio para usar a fonte)"/>
+              <div style="font-size:10px;color:var(--t2);margin-top:4px">Texto que aparece no PDF/DOCX como nome da operação. Vazio = usa a fonte.</div>
+            </div>
           </div>
           <div class="fr">
+            <div class="fg"><label>Data da escala</label><input type="date" id="ed"/></div>
             <div class="fg"><label>Município / UF</label>
               <select id="em" onchange="toggleMunOutra('em','em-outro')">
                 <option value="Colatina / ES">Colatina / ES</option>

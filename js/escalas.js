@@ -254,7 +254,8 @@ function cancelarEscala(id) {
       DB.addVrteMov({
         data: new Date().toISOString().split('T')[0],
         tipo: 'entrada',
-        tipoOp: 'Estorno',
+        // Estorno aplicado à FONTE original (não à suboperação)
+        tipoOp: escala.operacaoFonte || 'Estorno',
         qtd: vrteValor,
         ref: 'Estorno — cancelamento de escala ' + (escala.operacao || '') + ' (' + (escala.data || '') + ')'
       }, function(updated, err) {

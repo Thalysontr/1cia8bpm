@@ -93,7 +93,9 @@ function _coletarDadosMes(escs, mes, ano) {
     var d = new Date(e.data + 'T12:00:00');
     if (d.getMonth() !== mes || d.getFullYear() !== ano) return;
 
-    var op = String(e.operacao || '').trim();
+    // ⭐ Agrupa pela FONTE de VRTE (operacaoFonte). Fallback para operacao
+    // em escalas antigas que não tinham esse campo.
+    var op = String(e.operacaoFonte || e.operacao || '').trim();
     if (!op) return;
 
     var horas = parseInt(e.duracao, 10) || 8;
