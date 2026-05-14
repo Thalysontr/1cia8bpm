@@ -7,60 +7,110 @@ service cloud.firestore {
     function isColaborador() { return isAuth() && request.auth.token.role == 'colaborador'; }
     function isUser()        { return isAdmin() || isColaborador(); }
 
-    // Militares: leitura autenticada, escrita só admin
+    // Multi-tenant: usuário pode acessar a companhia?
+    // Custom Claim opcional `companhias`: lista de IDs permitidos.
+    // Admin SEM o claim = acesso total (transição). Com o claim, filtra.
+    function canAccessCia(cid) {
+      return isAuth() && (
+        !('companhias' in request.auth.token) ||
+        (request.auth.token.companhias is list && cid in request.auth.token.companhias) ||
+        isAdmin()
+      );
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // MULTI-TENANT (novo) — /companhias/{cid}/...
+    // ════════════════════════════════════════════════════════════
+    match /companhias/{cid} {
+      allow read:  if isAuth();         // qualquer autenticado lista companhias
+      allow write: if isAdmin();        // só admin cria/edita metadata
+
+      // Militares da companhia
+      match /mils/{docId} {
+        allow read:  if isUser() && canAccessCia(cid);
+        allow write: if isAdmin() && canAccessCia(cid);
+      }
+
+      // Operações
+      match /ops/{docId} {
+        allow read:   if isUser() && canAccessCia(cid);
+        allow create: if isUser() && canAccessCia(cid);
+        allow update: if isUser() && canAccessCia(cid);
+        allow delete: if isAdmin() && canAccessCia(cid);
+      }
+
+      // Escalas
+      match /escalas/{docId} {
+        allow read:   if isUser() && canAccessCia(cid);
+        allow create: if isUser() && canAccessCia(cid);
+        allow update: if isUser() && canAccessCia(cid);
+        allow delete: if isAdmin() && canAccessCia(cid);
+      }
+
+      // Dispensas
+      match /dispensas/{docId} {
+        allow read:  if isUser() && canAccessCia(cid);
+        allow write: if isUser() && canAccessCia(cid);
+      }
+
+      // Configs (vrte, usuarios, assinantes, anexo_visitas, ultimo_assinante)
+      match /config/{docId} {
+        allow read:  if isUser() && canAccessCia(cid);
+        allow write: if isAdmin() && canAccessCia(cid);
+      }
+      // VRTE pode ser escrito por qualquer usuário (registro de entradas/saídas)
+      match /config/vrte {
+        allow read:  if isUser() && canAccessCia(cid);
+        allow write: if isUser() && canAccessCia(cid);
+      }
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // LEGADO (raiz) — mantido durante a transição multi-tenant.
+    // Pode ser removido após migração completa estar testada.
+    // ════════════════════════════════════════════════════════════
     match /mils/{docId} {
       allow read: if isUser();
       allow write: if isAdmin();
     }
-
-    // Operações: leitura e criação para todos, exclusão só admin
     match /ops/{docId} {
       allow read:   if isUser();
       allow create: if isUser();
       allow update: if isUser();
       allow delete: if isAdmin();
     }
-
-    // Escalas: leitura e criação para todos, exclusão só admin
     match /escalas/{docId} {
       allow read:   if isUser();
       allow create: if isUser();
       allow update: if isUser();
       allow delete: if isAdmin();
     }
-
-    // Dispensas: leitura e escrita para todos autenticados
     match /dispensas/{docId} {
       allow read:  if isUser();
       allow write: if isUser();
     }
-
-    // Rate limiting de login (escrito antes da autenticação — acesso público restrito)
-    match /rateLimits/{docId} {
-      allow read, write: if true;
-    }
-
-    // Logs de autenticação — só leitura admin, escrita qualquer autenticado
-    match /logs/{docId} {
-      allow read:  if isAdmin();
-      allow write: if isAuth();
-    }
-
-    // Config geral: vrte e anexo_visitas para usuários autenticados
     match /config/vrte {
       allow read:  if isUser();
       allow write: if isUser();
     }
-
     match /config/anexo_visitas {
       allow read:  if isUser();
       allow write: if isAdmin();
     }
-
-    // Usuários: qualquer autenticado pode ler (sem senhas), só admin escreve
     match /config/usuarios    { allow read: if isAuth(); allow write: if isAdmin(); }
     match /config/assinantes  { allow read, write: if isAdmin(); }
     match /config/ultimo_assinante { allow read: if isUser(); allow write: if isAdmin(); }
+
+    // ════════════════════════════════════════════════════════════
+    // GLOBAIS (não particionadas por companhia)
+    // ════════════════════════════════════════════════════════════
+    match /rateLimits/{docId} {
+      allow read, write: if true;
+    }
+    match /logs/{docId} {
+      allow read:  if isAdmin();
+      allow write: if isAuth();
+    }
 
     // Bloquear tudo que não foi explicitamente liberado
     match /{document=**} {

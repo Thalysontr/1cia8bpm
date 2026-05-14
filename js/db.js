@@ -22,6 +22,19 @@ var _CACHE = {
   anexo:      null
 };
 
+// ─── MULTI-TENANT: helper para resolver caminho da coleção ──────
+// Quando _MULTI_TENANT=true (companhia.js), todas as coleções viram
+// subcoleções de /companhias/{id}/. Caso contrário, usam a raiz
+// (comportamento legado).
+function _colC(coll) {
+  if (typeof _MULTI_TENANT !== 'undefined' && _MULTI_TENANT &&
+      typeof getCompanhiaId === 'function') {
+    var cid = getCompanhiaId();
+    return FBDB.collection('companhias').doc(cid).collection(coll);
+  }
+  return FBDB.collection(coll);
+}
+
 // ─── BLINDAGEM: remove campos `undefined` recursivamente ────────
 // O Firestore rejeita `undefined` em qualquer campo com o erro:
 //   "Function DocumentReference.set() called with invalid data.
@@ -56,7 +69,7 @@ var DB = {
   // ── MILITARES ────────────────────────────────────────────────
   getMils: function(cb) {
     if (_CACHE.mils) { cb(_CACHE.mils); return; }
-    FBDB.collection('mils').orderBy('nome').get().then(function(snap) {
+    _colC('mils').orderBy('nome').get().then(function(snap) {
       var list = [];
       snap.forEach(function(d) { list.push(d.data()); });
       _CACHE.mils = list;
@@ -66,7 +79,7 @@ var DB = {
 
   saveMil: function(mil, cb) {
     var docId = mil.rg.replace(/\./g,'').replace(/-/g,'');
-    FBDB.collection('mils').doc(docId).set(_stripUndefined(mil)).then(function() {
+    _colC('mils').doc(docId).set(_stripUndefined(mil)).then(function() {
       _CACHE.mils = null; // limpa cache
       if (cb) cb();
     });
@@ -74,7 +87,7 @@ var DB = {
 
   deleteMil: function(rg, cb) {
     var docId = rg.replace(/\./g,'').replace(/-/g,'');
-    FBDB.collection('mils').doc(docId).delete().then(function() {
+    _colC('mils').doc(docId).delete().then(function() {
       _CACHE.mils = null;
       if (cb) cb();
     });
@@ -82,7 +95,7 @@ var DB = {
 
   updateMilHist: function(rg, hist, cb) {
     var docId = rg.replace(/\./g,'').replace(/-/g,'');
-    FBDB.collection('mils').doc(docId).update({ hist: _stripUndefined(hist) }).then(function() {
+    _colC('mils').doc(docId).update({ hist: _stripUndefined(hist) }).then(function() {
       _CACHE.mils = null;
       if (cb) cb();
     });
@@ -91,7 +104,7 @@ var DB = {
   // ── OPERAÇÕES ────────────────────────────────────────────────
   getOps: function(cb) {
     if (_CACHE.ops) { cb(_CACHE.ops); return; }
-    FBDB.collection('ops').get().then(function(snap) {
+    _colC('ops').get().then(function(snap) {
       var list = [];
       snap.forEach(function(d) { list.push(d.data()); });
       if (list.length === 0) {
@@ -104,7 +117,7 @@ var DB = {
         ];
         var batch = FBDB.batch();
         defaults.forEach(function(op) {
-          batch.set(FBDB.collection('ops').doc(op.id), _stripUndefined(op));
+          batch.set(_colC('ops').doc(op.id), _stripUndefined(op));
         });
         batch.commit().then(function() {
           _CACHE.ops = defaults;
@@ -119,14 +132,14 @@ var DB = {
 
   saveOp: function(op, cb) {
     var docId = 'op' + op.id;
-    FBDB.collection('ops').doc(docId).set(_stripUndefined(op)).then(function() {
+    _colC('ops').doc(docId).set(_stripUndefined(op)).then(function() {
       _CACHE.ops = null;
       if (cb) cb();
     });
   },
 
   deleteOp: function(id, cb) {
-    FBDB.collection('ops').doc('op' + id).delete().then(function() {
+    _colC('ops').doc('op' + id).delete().then(function() {
       _CACHE.ops = null;
       if (cb) cb();
     });
@@ -135,7 +148,7 @@ var DB = {
   // ── ESCALAS ──────────────────────────────────────────────────
   getEscs: function(cb) {
     if (_CACHE.escs) { cb(_CACHE.escs); return; }
-    FBDB.collection('escalas').orderBy('data','desc').get().then(function(snap) {
+    _colC('escalas').orderBy('data','desc').get().then(function(snap) {
       var list = [];
       snap.forEach(function(d) { list.push(d.data()); });
       _CACHE.escs = list;
@@ -144,14 +157,14 @@ var DB = {
   },
 
   saveEsc: function(esc, cb) {
-    FBDB.collection('escalas').doc(String(esc.id)).set(_stripUndefined(esc)).then(function() {
+    _colC('escalas').doc(String(esc.id)).set(_stripUndefined(esc)).then(function() {
       _CACHE.escs = null;
       if (cb) cb();
     });
   },
 
   deleteEsc: function(id, cb) {
-    FBDB.collection('escalas').doc(String(id)).delete().then(function() {
+    _colC('escalas').doc(String(id)).delete().then(function() {
       _CACHE.escs = null;
       if (cb) cb();
     });
@@ -160,7 +173,7 @@ var DB = {
   // ── VRTE ─────────────────────────────────────────────────────
   getVrte: function(cb) {
     if (_CACHE.vrte) { cb(_CACHE.vrte); return; }
-    FBDB.collection('config').doc('vrte').get().then(function(doc) {
+    _colC('config').doc('vrte').get().then(function(doc) {
       var v = doc.exists ? doc.data() : {saldo:0, hist:[]};
       _CACHE.vrte = v;
       cb(v);
@@ -168,7 +181,7 @@ var DB = {
   },
 
   saveVrte: function(vrte, cb) {
-    FBDB.collection('config').doc('vrte').set(_stripUndefined(vrte)).then(function() {
+    _colC('config').doc('vrte').set(_stripUndefined(vrte)).then(function() {
       _CACHE.vrte = vrte;
       if (cb) cb();
     });
@@ -182,7 +195,7 @@ var DB = {
   //
   // mov = { data, tipo: 'entrada'|'saida', qtd, tipoOp?, ref?, ts? }
   addVrteMov: function(mov, cb) {
-    var ref = FBDB.collection('config').doc('vrte');
+    var ref = _colC('config').doc('vrte');
     if (!mov.ts) mov.ts = Date.now();
     return FBDB.runTransaction(function(t) {
       return t.get(ref).then(function(doc) {
@@ -216,7 +229,7 @@ var DB = {
   // escala = objeto da escala completo (para fallback de identificação)
   // mov    = { data, tipo:'saida', tipoOp, qtd, ref } (sem escalaId — adicionado aqui)
   upsertVrteSaidaEscala: function(escalaId, escala, mov, cb) {
-    var ref = FBDB.collection('config').doc('vrte');
+    var ref = _colC('config').doc('vrte');
     return FBDB.runTransaction(function(t) {
       return t.get(ref).then(function(doc) {
         var v = doc.exists ? doc.data() : { saldo: 0, hist: [] };
@@ -283,7 +296,7 @@ var DB = {
   // Remove um lançamento por timestamp e recalcula o saldo do zero.
   // Tudo dentro de uma transação para evitar perdas concorrentes.
   removeVrteMov: function(ts, cb) {
-    var ref = FBDB.collection('config').doc('vrte');
+    var ref = _colC('config').doc('vrte');
     return FBDB.runTransaction(function(t) {
       return t.get(ref).then(function(doc) {
         if (!doc.exists) throw new Error('Documento VRTE não existe.');
@@ -316,7 +329,7 @@ var DB = {
   // ── USUÁRIOS ─────────────────────────────────────────────────
   getUsers: function(cb) {
     if (_CACHE.users) { cb(_CACHE.users); return; }
-    FBDB.collection('config').doc('usuarios').get().then(function(doc) {
+    _colC('config').doc('usuarios').get().then(function(doc) {
       var users = doc.exists ? doc.data().list : [];
       _CACHE.users = users;
       cb(users);
@@ -324,7 +337,7 @@ var DB = {
   },
 
   saveUsers: function(users, cb) {
-    FBDB.collection('config').doc('usuarios').set(_stripUndefined({list: users})).then(function() {
+    _colC('config').doc('usuarios').set(_stripUndefined({list: users})).then(function() {
       _CACHE.users = users;
       if (cb) cb();
     });
@@ -333,7 +346,7 @@ var DB = {
   // ── ASSINANTES ───────────────────────────────────────────────
   getAssinantes: function(cb) {
     if (_CACHE.assinantes) { cb(_CACHE.assinantes); return; }
-    FBDB.collection('config').doc('assinantes').get().then(function(doc) {
+    _colC('config').doc('assinantes').get().then(function(doc) {
       var list = doc.exists ? doc.data().list : [
         {nome:'THALYSON ELEOTÉRIO TRESMANN – 1º TEN QOCPM', rg:'RG 25.862-1 / NF 4304834', cargo:'COMANDANTE DA 1ª CIA/8º BPM'}
       ];
@@ -343,7 +356,7 @@ var DB = {
   },
 
   saveAssinantes: function(list, cb) {
-    FBDB.collection('config').doc('assinantes').set(_stripUndefined({list: list})).then(function() {
+    _colC('config').doc('assinantes').set(_stripUndefined({list: list})).then(function() {
       _CACHE.assinantes = list;
       if (cb) cb();
     });
@@ -353,7 +366,7 @@ var DB = {
   // Documentos indexados pelo campo edocs (ex: "2026-F7N5QB")
   getDisps: function(cb) {
     if (_CACHE.disps) { cb(_CACHE.disps); return; }
-    FBDB.collection('dispensas').get().then(function(snap) {
+    _colC('dispensas').get().then(function(snap) {
       var list = [];
       snap.forEach(function(d) { list.push(d.data()); });
       // ordenar por inicio decrescente em memória
@@ -366,14 +379,14 @@ var DB = {
   saveDisp: function(disp, cb) {
     // usa edocs como ID do documento — garante idempotência
     var docId = String(disp.edocs || disp.id || Date.now());
-    FBDB.collection('dispensas').doc(docId).set(_stripUndefined(disp)).then(function() {
+    _colC('dispensas').doc(docId).set(_stripUndefined(disp)).then(function() {
       _CACHE.disps = null;
       if (cb) cb();
     });
   },
 
   deleteDisp: function(edocs, cb) {
-    FBDB.collection('dispensas').doc(String(edocs)).delete().then(function() {
+    _colC('dispensas').doc(String(edocs)).delete().then(function() {
       _CACHE.disps = null;
       if (cb) cb();
     });
@@ -386,7 +399,7 @@ var DB = {
   // (via js/seed_data.js — não commitado) antes de carregar o app.
   getAnexoVisitas: function(cb) {
     if (_CACHE.anexo) { cb(_CACHE.anexo); return; }
-    FBDB.collection('config').doc('anexo_visitas').get().then(function(doc) {
+    _colC('config').doc('anexo_visitas').get().then(function(doc) {
       if (doc.exists) {
         // Firestore armazena como objetos {n,c,e} — converter para arrays [nome,contato,endereco]
         var raw = doc.data().list || [];
@@ -397,7 +410,7 @@ var DB = {
       // Seed único a partir do arquivo local não rastreado (seed_data.js)
       var seed = (typeof window !== 'undefined' && window._SEED_ANEXO_VISITAS) ? window._SEED_ANEXO_VISITAS : [];
       if (seed.length > 0) {
-        FBDB.collection('config').doc('anexo_visitas').set(_stripUndefined({ list: seed })).then(function() {
+        _colC('config').doc('anexo_visitas').set(_stripUndefined({ list: seed })).then(function() {
           _CACHE.anexo = seed.map(function(v) { return [v.n, v.c, v.e]; });
           cb(_CACHE.anexo);
         });
@@ -413,7 +426,7 @@ var DB = {
     var normalized = list.map(function(v) {
       return Array.isArray(v) ? {n: v[0], c: v[1], e: v[2]} : v;
     });
-    FBDB.collection('config').doc('anexo_visitas').set(_stripUndefined({ list: normalized })).then(function() {
+    _colC('config').doc('anexo_visitas').set(_stripUndefined({ list: normalized })).then(function() {
       _CACHE.anexo = list;
       if (cb) cb();
     });

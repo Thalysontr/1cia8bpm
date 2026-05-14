@@ -11,7 +11,8 @@ var APP = {
   vrte:       { saldo: 0, hist: [] },
   users:      [],
   assinantes: [],
-  disps:      []
+  disps:      [],
+  companhiaId: '1cia8bpm' // companhia ativa (multi-tenant)
 };
 
 // ─── Navegação ──────────────────────────────────────────────────
@@ -39,6 +40,8 @@ function render(id) {
 
 // ─── Inicialização — carrega tudo do Firestore antes de renderizar
 function initApp() {
+  // Multi-tenant: garante que a companhia ativa está definida
+  if (typeof initCompanhia === 'function') initCompanhia();
   var h = new Date();
   document.getElementById('dd').textContent = h.toLocaleDateString('pt-BR', {
     weekday:'long', day:'2-digit', month:'long', year:'numeric'

@@ -562,6 +562,8 @@
      TEMPLATE DOCX (base64 embutido)
 ══════════════════════════════════════════ -->
 
+<!-- Multi-tenant: companhia ativa (DEVE vir antes do db.js para o helper _colC funcionar) -->
+<script src="js/companhia.js"></script>
 <script src="js/db.js"></script>
 <script>
 // Template DOCX inline (mantido aqui por ser grande e estático)
@@ -591,6 +593,7 @@ var TMPL_B64="UEsDBBQAAAAIAIFdlVzJf3/HuAEAABMJAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbL
 <script src="js/vrte.js"></script>
 <script src="js/operacoes.js"></script>
 <script src="js/logos.js"></script>
+<script src="js/logos_ft.js"></script>
 <script src="js/escala.js"></script>
 <script src="js/escalas.js"></script>
 <script src="js/militares.js"></script>
@@ -601,6 +604,7 @@ var TMPL_B64="UEsDBBQAAAAIAIFdlVzJf3/HuAEAABMJAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbL
 <script src="js/vrte_painel_patch.js"></script>
 <script src="js/vrte_calendario.js"></script>
 <script src="js/vrte_reatribuir.js"></script>
+<script src="js/migrar_para_companhias.js"></script>
 
 </body>
 </html>
