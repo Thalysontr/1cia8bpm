@@ -1,4 +1,8 @@
 // ═══ MILITARES ═══
+
+// Estado: RG do militar em edição (null = modo cadastro de novo)
+var _editandoMilRg = null;
+
 function rMils(){
   var ms=APP.mils;
   var el=document.getElementById('ml2');
@@ -32,6 +36,7 @@ function rMils(){
       return '<span style="font-size:10px;font-family:var(--mo);color:'+(tp==='vermelha'?'var(--rd)':'var(--gn)')+'" title="'+x.op+'">'+fd(x.data)+'</span>';
     }).join(' · ');
     var ngHtml = m.nomeGuerra ? '<strong>'+m.nomeGuerra+'</strong> · ' : '';
+    var rgSafe = (m.rg || '').replace(/'/g, "\\'");
     return '<div class="mrow2">'
       +'<div class="av">'+av+'</div>'
       +'<div style="flex:1">'
@@ -46,32 +51,177 @@ function rMils(){
         +'</div>'
         +'<span class="ec" style="font-size:11px">'+h.length+' total</span>'
       +'</div>'
-      +'<button class="btn bsm brd" onclick="delMilRg(this)" data-rg="'+m.rg+'">×</button>'
+      +'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'
+        +'<button class="btn bsm" onclick="editarMil(\''+rgSafe+'\')" title="Editar dados deste militar" style="background:#1565c0;color:#fff">✏ Editar</button>'
+        +'<button class="btn bsm brd" onclick="delMilRg(this)" data-rg="'+m.rg+'" title="Excluir militar">× Excluir</button>'
+      +'</div>'
       +'</div>';
   }).join('');
   if(!fil.length)el.innerHTML='<div class="empty">Nenhum militar encontrado.</div>';
 }
+
 function filtrarMils(){rMils();}
+
+// ═══════════════════════════════════════════════════════════════
+// SALVAR — cria novo OU atualiza existente (se _editandoMilRg)
+// ═══════════════════════════════════════════════════════════════
 function salvarMil(){
-  var po=document.getElementById('mpo').value,no=document.getElementById('mno').value.trim();
+  var po=document.getElementById('mpo').value;
+  var no=document.getElementById('mno').value.trim();
   var ng=(document.getElementById('mng')||{}).value;ng=ng?ng.trim():'';
-  var rg=document.getElementById('mrg').value.trim(),nf=document.getElementById('mnf').value.trim();
+  var rg=document.getElementById('mrg').value.trim();
+  var nf=document.getElementById('mnf').value.trim();
   var fu=document.getElementById('mfu').value;
   if(!no||!rg)return alert('Preencha nome e RG.');
-  if(APP.mils.find(m=>m.rg===rg))return alert('RG já cadastrado.');
+
+  var isEdit = !!_editandoMilRg;
+
+  if (isEdit) {
+    // ─── MODO EDIÇÃO ───
+    var antigo = (APP.mils || []).find(function(m) { return m.rg === _editandoMilRg; });
+    if (!antigo) {
+      alert('Militar não encontrado para edição. Recarregue a página.');
+      _resetMilForm();
+      return;
+    }
+
+    // Se o RG foi alterado, garantir que não colide com outro existente
+    if (rg !== _editandoMilRg) {
+      var colide = (APP.mils || []).find(function(m) { return m.rg === rg; });
+      if (colide) { alert('Já existe outro militar com este RG.'); return; }
+    }
+
+    // Preserva hist e quaisquer outros campos não-editáveis
+    var atualizado = Object.assign({}, antigo, {
+      posto: po, nomeGuerra: ng, nome: no, rg: rg, nf: nf, func: fu
+    });
+
+    function _aplicarSalvar() {
+      DB.saveMil(atualizado, function() {
+        reloadMils(function() {
+          rMils();
+          _resetMilForm();
+          alert('✓ Militar atualizado com sucesso.');
+        });
+      });
+    }
+
+    if (rg !== _editandoMilRg) {
+      // RG mudou — precisa criar o novo doc e deletar o antigo (docId vem do RG)
+      DB.deleteMil(_editandoMilRg, function() { _aplicarSalvar(); });
+    } else {
+      _aplicarSalvar();
+    }
+    return;
+  }
+
+  // ─── MODO CADASTRO NOVO ───
+  if(APP.mils.find(function(m){return m.rg===rg;}))return alert('RG já cadastrado.');
   var mil={posto:po,nomeGuerra:ng,nome:no,rg:rg,nf:nf,func:fu,hist:[]};
   DB.saveMil(mil,function(){
     reloadMils(function(){ rMils(); show('ma'); });
   });
-  document.getElementById('mno').value='';
-  if(document.getElementById('mng'))document.getElementById('mng').value='';
-  document.getElementById('mrg').value='';document.getElementById('mnf').value='';
+  _resetMilForm();
 }
+
+// ═══════════════════════════════════════════════════════════════
+// EDITAR — carrega militar no form para alteração
+// ═══════════════════════════════════════════════════════════════
+function editarMil(rg) {
+  var m = (APP.mils || []).find(function(x) { return x.rg === rg; });
+  if (!m) { alert('Militar não encontrado.'); return; }
+
+  _editandoMilRg = rg;
+
+  // Popula o form
+  var mpo = document.getElementById('mpo');
+  if (mpo) {
+    // Tenta selecionar; se posto não estiver na lista, adiciona dinamicamente
+    var achou = false;
+    for (var i = 0; i < mpo.options.length; i++) {
+      if (mpo.options[i].value === m.posto) { mpo.value = m.posto; achou = true; break; }
+    }
+    if (!achou && m.posto) {
+      var opt = document.createElement('option');
+      opt.value = m.posto; opt.textContent = m.posto;
+      mpo.appendChild(opt);
+      mpo.value = m.posto;
+    }
+  }
+  var mng = document.getElementById('mng'); if (mng) mng.value = m.nomeGuerra || '';
+  var mno = document.getElementById('mno'); if (mno) mno.value = m.nome || '';
+  var mrg = document.getElementById('mrg'); if (mrg) mrg.value = m.rg || '';
+  var mnf = document.getElementById('mnf'); if (mnf) mnf.value = m.nf || '';
+  var mfu = document.getElementById('mfu');
+  if (mfu) {
+    var achouF = false;
+    for (var j = 0; j < mfu.options.length; j++) {
+      if (mfu.options[j].value === m.func) { mfu.value = m.func; achouF = true; break; }
+    }
+    if (!achouF && m.func) {
+      var optF = document.createElement('option');
+      optF.value = m.func; optF.textContent = m.func;
+      mfu.appendChild(optF);
+      mfu.value = m.func;
+    }
+  }
+
+  // Troca o botão Cadastrar por Salvar/Cancelar
+  _renderBotaoMilForm(true, m);
+
+  // Scroll para o topo do form
+  var cardCadastro = document.getElementById('mpo');
+  if (cardCadastro && cardCadastro.scrollIntoView) {
+    cardCadastro.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function cancelarEdicaoMil() {
+  _resetMilForm();
+}
+
+function _resetMilForm() {
+  _editandoMilRg = null;
+  ['mno','mng','mrg','mnf'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  _renderBotaoMilForm(false, null);
+}
+
+// Atualiza o título do card e os botões (Cadastrar vs Salvar/Cancelar)
+function _renderBotaoMilForm(isEdit, m) {
+  // Atualiza título do card "Cadastrar militar"
+  var card = document.getElementById('mpo');
+  if (card) {
+    var ct = card.closest('.card').querySelector('.ct');
+    if (ct) {
+      if (isEdit) {
+        ct.innerHTML = 'Editando militar: <span style="color:#1565c0">' + (m.nomeGuerra || m.nome) + '</span> <span style="font-size:10px;color:var(--t2);font-weight:400">(RG ' + m.rg + ')</span>';
+      } else {
+        ct.textContent = 'Cadastrar militar';
+      }
+    }
+  }
+
+  // Container dos botões (id dedicado no index.html)
+  var ar2 = document.getElementById('mil-form-acoes');
+  if (!ar2) return;
+
+  if (isEdit) {
+    ar2.innerHTML = '<button class="btn" onclick="cancelarEdicaoMil()">Cancelar edição</button>' +
+                    '<button class="btn bp" onclick="salvarMil()">✓ Salvar alterações</button>';
+  } else {
+    ar2.innerHTML = '<button class="btn bp" onclick="salvarMil()">Cadastrar</button>';
+  }
+}
+
 function delMilRg(btn){
   var rg=btn.getAttribute('data-rg');
   if(!confirm('Excluir?'))return;
   DB.deleteMil(rg,function(){ reloadMils(function(){ rMils(); }); });
 }
+
 function delMil(rg){
   if(!confirm('Excluir?'))return;
   DB.deleteMil(rg,function(){ reloadMils(function(){ rMils(); }); });
