@@ -3,26 +3,62 @@
 // Estado: RG do militar em edição (null = modo cadastro de novo)
 var _editandoMilRg = null;
 
+// ───────────────────────────────────────────────────────────────
+// Constrói o histórico de cada militar DINAMICAMENTE a partir de
+// APP.escs. Evita bug de sincronização entre mil.hist e escalas reais.
+// Retorna: { rg → [ {data, op, tipo, escalaId} ordenado por data ASC ] }
+// ───────────────────────────────────────────────────────────────
+function _buildHistMilitares() {
+  var hist = {};
+  (APP.escs || []).forEach(function(e) {
+    if (!e || e.cancelada === true || e.status === 'cancelada') return;
+    if (!e.data) return;
+    var mils = e.militares || [];
+    // Dedupe por rg dentro da escala
+    var vistos = {};
+    mils.forEach(function(m) {
+      var rg = m && m.rg;
+      if (!rg || vistos[rg]) return;
+      vistos[rg] = true;
+      if (!hist[rg]) hist[rg] = [];
+      hist[rg].push({
+        data: e.data,
+        op: e.operacao || '',
+        tipo: tipoEscala(e.data),
+        escalaId: e.id || ''
+      });
+    });
+  });
+  Object.keys(hist).forEach(function(rg) {
+    hist[rg].sort(function(a, b) { return (a.data || '').localeCompare(b.data || ''); });
+  });
+  return hist;
+}
+
 function rMils(){
   var ms=APP.mils;
   var el=document.getElementById('ml2');
   if(!ms.length){el.innerHTML='<div class="empty">Nenhum militar cadastrado.</div>';return;}
   var q=(document.getElementById('mil-busca')||{}).value||'';
   var filtroTipo=document.getElementById('mil-filtro-tipo')?document.getElementById('mil-filtro-tipo').value:'todos';
+
+  // Calcula hist dinâmico (sempre reflete o estado real das escalas)
+  var HIST = _buildHistMilitares();
+
   var fil=ms.filter(function(m){
     var matchQ=!q||(m.nome.toLowerCase().includes(q.toLowerCase())||m.rg.includes(q));
     if(!matchQ)return false;
     if(filtroTipo==='todos')return true;
-    var h=m.hist||[];
+    var h = HIST[m.rg] || [];
     if(!h.length)return filtroTipo==='sem';
     var ult=h[h.length-1];
     return tipoEscala(ult.data)===filtroTipo;
   });
-  fil=fil.slice().sort(function(a,b){return (b.hist||[]).length-(a.hist||[]).length;});
+  fil=fil.slice().sort(function(a,b){return (HIST[b.rg]||[]).length-(HIST[a.rg]||[]).length;});
   el.innerHTML=fil.map(function(m){
-    var h=m.hist||[];
-    var verdes=h.filter(function(x){return x.tipo==='verde'||(x.data&&tipoEscala(x.data)==='verde');}).length;
-    var vermelhas=h.filter(function(x){return x.tipo==='vermelha'||(x.data&&tipoEscala(x.data)==='vermelha');}).length;
+    var h = HIST[m.rg] || [];
+    var verdes=h.filter(function(x){return x.tipo==='verde';}).length;
+    var vermelhas=h.filter(function(x){return x.tipo==='vermelha';}).length;
     var ult=h.length?h[h.length-1]:null;
     var ini=m.nome.split(' ');
     var av=((ini[0]||'')[0]||'').toUpperCase()+((ini[1]||ini[0]||'')[0]||'').toUpperCase();

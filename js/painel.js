@@ -119,10 +119,20 @@ function rPainel() {
   if (saldo < 500)        alertas.push({ tipo: 'danger', msg: 'Saldo VRTE crítico: ' + saldo.toLocaleString('pt-BR') + ' VRTE' });
   else if (saldo < 2000)  alertas.push({ tipo: 'warn',   msg: 'Saldo VRTE baixo: '   + saldo.toLocaleString('pt-BR') + ' VRTE' });
 
+  // Calcula última data de escala por militar (dinamicamente, a partir de APP.escs)
   var hoje30 = new Date(hoje - 30 * 86400000);
+  var ultDataPorRg = {};
+  (APP.escs || []).forEach(function(esc) {
+    if (!esc || esc.cancelada === true || esc.status === 'cancelada') return;
+    if (!esc.data) return;
+    (esc.militares || []).forEach(function(m) {
+      var rg = m && m.rg;
+      if (!rg) return;
+      if (!ultDataPorRg[rg] || esc.data > ultDataPorRg[rg]) ultDataPorRg[rg] = esc.data;
+    });
+  });
   var semEscalar = mils.filter(function(m) {
-    if (!m.hist || !m.hist.length) return true;
-    var ultRaw = m.hist[m.hist.length - 1].data;
+    var ultRaw = ultDataPorRg[m.rg];
     if (!ultRaw) return true;
     var ult = new Date(ultRaw + 'T12:00:00');
     return ult < hoje30;
