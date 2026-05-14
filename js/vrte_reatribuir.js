@@ -252,6 +252,86 @@ window.diagnosticarVRTE = function(yyyymm) {
   return { saidas: saidas, entradas: entradas, orfas: orfas };
 };
 
+// ═══════════════════════════════════════════════════════════════
+// RECONSTRUIR VRTE A PARTIR DAS ESCALAS ATIVAS
+// ═══════════════════════════════════════════════════════════════
+//
+// Versão "limpeza definitiva": apaga TODAS as saídas atuais do
+// histórico e recria UMA saída por escala ATIVA (qtd = vrteTotal).
+// MANTÉM todas as entradas (créditos manuais registrados pelo usuário).
+//
+// Use isto quando o histórico ficar inconsistente (ajustes legacy,
+// órfãs de edições antigas, duplicações etc.).
+window.reconstruirVRTEDeSEscalas = function() {
+  var hist = (APP.vrte && (APP.vrte.hist || APP.vrte.historico) || []).slice();
+  var entradas = hist.filter(function(h) { return h.tipo === 'entrada'; });
+  var saidasAtuais = hist.filter(function(h) { return h.tipo === 'saida'; });
+
+  var escsAtivas = (APP.escs || []).filter(function(e) {
+    return e && e.id && !(e.cancelada === true || e.status === 'cancelada') &&
+           (e.vrteTotal || 0) > 0;
+  });
+
+  var totalEntradas = entradas.reduce(function(s, h) { return s + (parseFloat(h.qtd) || 0); }, 0);
+  var totalSaidasNovas = escsAtivas.reduce(function(s, e) { return s + (parseFloat(e.vrteTotal) || 0); }, 0);
+  var saldoEsperado = totalEntradas - totalSaidasNovas;
+
+  var msg =
+    'RECONSTRUIR HISTÓRICO VRTE\n\n' +
+    'ATUAL:\n' +
+    '  ' + entradas.length + ' entradas\n' +
+    '  ' + saidasAtuais.length + ' saídas\n\n' +
+    'NOVO:\n' +
+    '  ' + entradas.length + ' entradas (mantidas)\n' +
+    '  ' + escsAtivas.length + ' saídas (uma por escala ativa)\n\n' +
+    'TOTAIS:\n' +
+    '  Total entradas: ' + totalEntradas.toLocaleString('pt-BR') + ' VRTE\n' +
+    '  Total saídas:   ' + totalSaidasNovas.toLocaleString('pt-BR') + ' VRTE\n' +
+    '  Saldo final:    ' + saldoEsperado.toLocaleString('pt-BR') + ' VRTE\n\n' +
+    'Continuar?';
+
+  if (!confirm(msg)) return;
+
+  // Gera saídas novas a partir das escalas ativas
+  var novasSaidas = escsAtivas.map(function(e) {
+    return {
+      escalaId: e.id,
+      data: e.data,
+      tipo: 'saida',
+      tipoOp: e.operacaoFonte || e.operacao || '',
+      qtd: parseFloat(e.vrteTotal) || 0,
+      ref: 'Escala — ' + (e.operacao || e.operacaoFonte || ''),
+      ts: e.criadaEm ? new Date(e.criadaEm).getTime() : (Date.now())
+    };
+  });
+
+  // Junta entradas + saídas novas, ordena por ts, recalcula saldo
+  var todos = entradas.concat(novasSaidas);
+  todos.sort(function(a, b) { return (a.ts || 0) - (b.ts || 0); });
+
+  var saldo = 0;
+  todos.forEach(function(h) {
+    if (h.tipo === 'entrada')      saldo += (h.qtd || 0);
+    else if (h.tipo === 'saida')   saldo -= (h.qtd || 0);
+    h.saldoApos = saldo;
+  });
+
+  console.log('[reconstruir] entradas=' + entradas.length + ' saidasNovas=' + novasSaidas.length + ' saldo=' + saldo);
+
+  DB.saveVrte({ saldo: saldo, hist: todos, historico: todos }, function() {
+    if (typeof reloadVrte === 'function') {
+      reloadVrte(function() {
+        if (typeof rVRTE === 'function') rVRTE();
+        if (typeof rPainel === 'function') rPainel();
+        alert('✓ Histórico VRTE reconstruído\n\n' +
+          entradas.length + ' entradas preservadas\n' +
+          novasSaidas.length + ' saídas (uma por escala ativa)\n' +
+          'Saldo final: ' + saldo.toLocaleString('pt-BR') + ' VRTE');
+      });
+    }
+  });
+};
+
 window.limparVRTEEntries = function(tsList) {
   if (!Array.isArray(tsList) || !tsList.length) {
     alert('Use: limparVRTEEntries([1234567890, 9876543210])');
