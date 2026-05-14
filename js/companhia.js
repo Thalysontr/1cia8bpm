@@ -15,8 +15,8 @@
 // ═══════════════════════════════════════════════════════════════
 
 // ⚙️ Flag que controla se o sistema usa multi-tenant ou raiz
-// Ligar APÓS rodar a migração com sucesso.
-var _MULTI_TENANT = false;
+// Ligada em 2026 após migração bem-sucedida (162 mils, 38 escs, 184 disp).
+var _MULTI_TENANT = true;
 
 // Metadados das companhias cadastradas no sistema.
 // Em produção, virá de /companhias (Firestore). Esta lista é o seed
