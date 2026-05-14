@@ -32,16 +32,16 @@
               <input type="text" id="mil-busca" placeholder="Buscar..." style="font-size:12px;padding:5px 10px;border:1px solid var(--b);border-radius:var(--r);background:var(--s2);width:180px" oninput="filtrarMils()"/>
               <select id="mil-filtro-tipo" onchange="filtrarMils()" style="font-size:12px;padding:5px 8px;border:1px solid var(--b);border-radius:var(--r);background:var(--s2)">
                 <option value="todos">Todos</option>
-                <option value="verde">Última: Verde (seg–qui)</option>
-                <option value="vermelha">Última: Vermelha (sex–dom)</option>
+                <option value="verde">Última: Verde (seg–sex)</option>
+                <option value="vermelha">Última: Vermelha (sáb–dom)</option>
                 <option value="sem">Sem histórico</option>
               </select>
             </div>
           </div>
           <!-- legenda -->
           <div style="display:flex;gap:14px;margin-bottom:10px;font-size:11px;color:var(--t2)">
-            <span><span style="display:inline-block;width:10px;height:10px;background:var(--gn2);border:1px solid var(--gn);border-radius:2px;margin-right:4px"></span>Escala verde = seg a qui</span>
-            <span><span style="display:inline-block;width:10px;height:10px;background:var(--rd2);border:1px solid var(--rd);border-radius:2px;margin-right:4px"></span>Escala vermelha = sex, sáb, dom</span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:var(--gn2);border:1px solid var(--gn);border-radius:2px;margin-right:4px"></span>Escala verde = seg a sex</span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:var(--rd2);border:1px solid var(--rd);border-radius:2px;margin-right:4px"></span>Escala vermelha = sáb e dom</span>
             <span><span style="color:var(--rd);font-weight:600">⚠</span> = 3+ vermelhas seguidas</span>
           </div>
           <div id="ml2"></div>

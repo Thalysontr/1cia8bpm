@@ -741,7 +741,7 @@ function updVN() {
   vn.style.cssText += ';padding:10px 14px;border-radius:var(--r);border:1px solid;' + corBg;
   vn.innerHTML = [
     '<div style="font-weight:700;font-size:12px;margin-bottom:4px">',
-    '  ' + (tipo === 'vermelha' ? '🔴 Escala vermelha (sex/sáb/dom)' : '🟢 Escala verde (seg–qui)'),
+    '  ' + (tipo === 'vermelha' ? '🔴 Escala vermelha (sáb/dom)' : '🟢 Escala verde (seg–sex)'),
     '</div>',
     '<div style="font-size:11px;color:var(--t2)">',
     '  ', totalMils, ' militar(es) × ', debUnit, ' VRTE = <strong>', debTotal, ' VRTE</strong>',

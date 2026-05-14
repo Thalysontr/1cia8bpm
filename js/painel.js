@@ -144,8 +144,8 @@ function rPainel() {
       '<div class="mc acc"><div class="mcl">Saldo VRTE</div><div class="mcv">' + saldo.toLocaleString('pt-BR') + '</div><div class="mcs2">disponível agora</div></div>'
       + '<div class="mc"><div class="mcl">Escalas em ' + mesNome + '</div><div class="mcv">' + em.length + '</div><div class="mcs2">' + emAnt.length + ' no mês anterior</div></div>'
       + '<div class="mc"><div class="mcl">VRTE usadas/mês</div><div class="mcv">' + vrteM.toLocaleString('pt-BR') + '</div><div class="mcs2">' + (vrtePrev > 0 ? 'Projeção: ' + vrtePrev + ' meses restantes' : 'Sem consumo no mês') + '</div></div>'
-      + '<div class="mc"><div class="mcl">Escala verde</div><div class="mcv" style="color:var(--gn)">' + verdes + '</div><div class="mcs2">seg–qui este mês</div></div>'
-      + '<div class="mc"><div class="mcl">Escala vermelha</div><div class="mcv" style="color:var(--rd)">' + vermelhas + '</div><div class="mcs2">sex–dom este mês</div></div>'
+      + '<div class="mc"><div class="mcl">Escala verde</div><div class="mcv" style="color:var(--gn)">' + verdes + '</div><div class="mcs2">seg–sex este mês</div></div>'
+      + '<div class="mc"><div class="mcl">Escala vermelha</div><div class="mcv" style="color:var(--rd)">' + vermelhas + '</div><div class="mcs2">sáb–dom este mês</div></div>'
       + '<div class="mc"><div class="mcl">Militares</div><div class="mcv">' + mils.length + '</div><div class="mcs2">cadastrados</div></div>';
   }
 

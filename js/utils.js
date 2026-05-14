@@ -6,7 +6,8 @@
 function tipoEscala(dataStr){
   var d=new Date(dataStr+'T12:00:00');
   var dow=d.getDay();
-  return (dow===0||dow===5||dow===6)?'vermelha':'verde';
+  // Verde: segunda a sexta (1-5) | Vermelha: sábado e domingo (0, 6)
+  return (dow===0||dow===6)?'vermelha':'verde';
 }
 function badgeTipo(dataStr){
   var t=tipoEscala(dataStr);
