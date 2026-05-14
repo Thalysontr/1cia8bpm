@@ -251,6 +251,16 @@
           <div id="cal-iseo-detalhes" style="margin-top:10px"></div>
         </div>
 
+        <!-- Reatribuir Operação Fonte (corrige escalas criadas sem fonte explícita) -->
+        <div class="card" id="vrte-reatrib-card" style="display:none">
+          <div class="ch"><span class="ct">🔄 Reatribuir Operação Fonte</span></div>
+          <div style="font-size:11px;color:var(--t2);margin-bottom:10px">
+            Estas operações aparecem no histórico mas <strong>não estão cadastradas</strong> em "Operações".
+            Reatribua o débito de VRTE para a operação correta (a antiga vira <strong>suboperação</strong> e o histórico é corrigido).
+          </div>
+          <div id="vrte-reatrib-lista"></div>
+        </div>
+
         <!-- Registrar entrada (novo layout com botões de operação) -->
         <div class="card">
           <div class="ch"><span class="ct">Registrar entrada de VRTE</span></div>
@@ -590,6 +600,7 @@ var TMPL_B64="UEsDBBQAAAAIAIFdlVzJf3/HuAEAABMJAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbL
 <script src="js/patches.js"></script>
 <script src="js/vrte_painel_patch.js"></script>
 <script src="js/vrte_calendario.js"></script>
+<script src="js/vrte_reatribuir.js"></script>
 
 </body>
 </html>

@@ -207,6 +207,79 @@ var DB = {
     });
   },
 
+  // ── VRTE: UPSERT SAÍDA POR ESCALA ────────────────────────────
+  // Cria ou substitui a saída de VRTE associada a uma escala específica.
+  // Garante UM lançamento por escala no histórico (limpa duplicações de ajustes
+  // criados em edições anteriores). Identifica a entry por escalaId (entries
+  // novas) ou por ref+data (entries antigas, fallback).
+  //
+  // escala = objeto da escala completo (para fallback de identificação)
+  // mov    = { data, tipo:'saida', tipoOp, qtd, ref } (sem escalaId — adicionado aqui)
+  upsertVrteSaidaEscala: function(escalaId, escala, mov, cb) {
+    var ref = FBDB.collection('config').doc('vrte');
+    return FBDB.runTransaction(function(t) {
+      return t.get(ref).then(function(doc) {
+        var v = doc.exists ? doc.data() : { saldo: 0, hist: [] };
+        var hist = (v.hist || v.historico || []).slice();
+
+        // 1) Procura entry existente por escalaId
+        var idx = -1;
+        for (var i = 0; i < hist.length; i++) {
+          var h = hist[i];
+          if (h && h.tipo === 'saida' && h.escalaId === escalaId) { idx = i; break; }
+        }
+
+        // 2) Fallback: procura por ref + data (entries antigas sem escalaId)
+        if (idx === -1) {
+          var refEsperada = 'Escala — ' + (escala.operacao || escala.operacaoFonte || '');
+          var refEsperada2 = 'Escala — ' + (escala.operacaoFonte || escala.operacao || '');
+          for (var j = 0; j < hist.length; j++) {
+            var h2 = hist[j];
+            if (!h2 || h2.tipo !== 'saida' || h2.escalaId) continue;
+            if ((h2.ref === refEsperada || h2.ref === refEsperada2) &&
+                (h2.data || '') === (escala.data || '')) {
+              idx = j; break;
+            }
+          }
+        }
+
+        var novaMov = Object.assign({}, mov, { escalaId: escalaId });
+
+        // Se qtd é 0 e existe entry: REMOVE (escala sem VRTE)
+        if ((!novaMov.qtd || novaMov.qtd === 0) && idx !== -1) {
+          hist.splice(idx, 1);
+        } else if (idx !== -1) {
+          // Atualiza preservando ts original (mantém ordem cronológica)
+          novaMov.ts = hist[idx].ts || Date.now();
+          hist[idx] = novaMov;
+        } else if (novaMov.qtd && novaMov.qtd > 0) {
+          // Cria nova
+          if (!novaMov.ts) novaMov.ts = Date.now();
+          hist.push(novaMov);
+        }
+
+        // Recalcula saldo do zero, ordenado por timestamp
+        var ordenado = hist.slice().sort(function(a, b) { return (a.ts || 0) - (b.ts || 0); });
+        var saldo = 0;
+        ordenado.forEach(function(h) {
+          if (h.tipo === 'entrada')      saldo += (h.qtd || 0);
+          else if (h.tipo === 'saida')   saldo -= (h.qtd || 0);
+          h.saldoApos = saldo;
+        });
+
+        var updated = { saldo: saldo, hist: ordenado, historico: ordenado };
+        t.set(ref, _stripUndefined(updated));
+        return updated;
+      });
+    }).then(function(updated) {
+      _CACHE.vrte = updated;
+      if (cb) cb(updated);
+    }).catch(function(err) {
+      console.error('[DB.upsertVrteSaidaEscala] erro:', err);
+      if (cb) cb(null, err);
+    });
+  },
+
   // Remove um lançamento por timestamp e recalcula o saldo do zero.
   // Tudo dentro de uma transação para evitar perdas concorrentes.
   removeVrteMov: function(ts, cb) {

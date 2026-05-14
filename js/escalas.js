@@ -249,17 +249,19 @@ function cancelarEscala(id) {
       });
     }
 
-    if (vrteValor > 0 && typeof DB.addVrteMov === 'function') {
-      // Transação atômica — estorno seguro contra concorrência
-      DB.addVrteMov({
-        data: new Date().toISOString().split('T')[0],
-        tipo: 'entrada',
-        // Estorno aplicado à FONTE original (não à suboperação)
-        tipoOp: escala.operacaoFonte || 'Estorno',
-        qtd: vrteValor,
-        ref: 'Estorno — cancelamento de escala ' + (escala.operacao || '') + ' (' + (escala.data || '') + ')'
+    // ⭐ Cancelamento: REMOVE a saída original do histórico VRTE (upsert qtd=0)
+    // Em vez de criar uma entrada de "Estorno", apaga a saída — histórico limpo,
+    // saldo restaurado automaticamente. A escala fica marcada como cancelada no
+    // documento /escalas mas não aparece mais como movimento em /config/vrte.
+    if (vrteValor > 0 && typeof DB.upsertVrteSaidaEscala === 'function') {
+      DB.upsertVrteSaidaEscala(escala.id, escala, {
+        data: escala.data || new Date().toISOString().split('T')[0],
+        tipo: 'saida',
+        tipoOp: escala.operacaoFonte || escala.operacao || '',
+        qtd: 0, // qtd=0 → remove a entry existente
+        ref: 'Escala — ' + (escala.operacao || '')
       }, function(updated, err) {
-        if (err) console.error('[cancelarEscala] falha ao estornar VRTE:', err);
+        if (err) console.error('[cancelarEscala] falha ao remover VRTE da escala:', err);
         finalizar();
       });
     } else {

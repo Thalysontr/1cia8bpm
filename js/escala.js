@@ -1044,43 +1044,26 @@ function salvarEsc() {
     DB.saveEsc(escala, function(resultado) {
       console.log('[salvarEsc] DB.saveEsc retornou:', resultado);
 
-      if (typeof DB.addVrteMov !== 'function') {
+      if (typeof DB.upsertVrteSaidaEscala !== 'function') {
+        console.warn('[salvarEsc] DB.upsertVrteSaidaEscala não disponível — recarregue a página');
         finalizarSalvar();
         return;
       }
 
-      if (isEdit) {
-        // EDIÇÃO: aplicar apenas o DELTA do VRTE (novo - antigo)
-        var delta = (d.vrteTotal || 0) - oldVrteTotal;
-        if (delta === 0) { finalizarSalvar(); return; }
-        DB.addVrteMov({
-          data: d.data,
-          tipo: delta > 0 ? 'saida' : 'entrada',
-          // Débito sempre usa a FONTE de VRTE; ajustes (entrada) marcam como "Ajuste"
-          tipoOp: delta > 0 ? (d.operacaoFonte || d.operacao) : 'Ajuste',
-          qtd: Math.abs(delta),
-          ref: 'Ajuste — edição da escala ' + d.operacao + ' (' + d.data + ')'
-        }, function(updated, err) {
-          if (err) console.error('[salvarEsc/edit] falha ao ajustar VRTE:', err);
-          finalizarSalvar();
-        });
-      } else if (d.vrteTotal > 0) {
-        // NOVA ESCALA: débito completo do vrteTotal
-        DB.addVrteMov({
-          data: d.data,
-          tipo: 'saida',
-          // Débito usa a FONTE de VRTE — assim o relatório/saldo agrupa pela operação cadastrada
-          tipoOp: d.operacaoFonte || d.operacao,
-          qtd: d.vrteTotal,
-          // Ref preserva a suboperação para rastrear no histórico do VRTE
-          ref: 'Escala — ' + (d.operacao || d.operacaoFonte)
-        }, function(updated, err) {
-          if (err) console.error('[salvarEsc] falha ao debitar VRTE:', err);
-          finalizarSalvar();
-        });
-      } else {
+      // ⭐ UPSERT por escalaId — uma única entry de VRTE por escala
+      // (substitui a saída anterior em vez de criar ajustes; remove se qtd=0)
+      DB.upsertVrteSaidaEscala(id, escala, {
+        data: d.data,
+        tipo: 'saida',
+        // Débito usa a FONTE de VRTE — relatório/saldo agrupa pela operação cadastrada
+        tipoOp: d.operacaoFonte || d.operacao,
+        qtd: d.vrteTotal || 0,
+        // Ref preserva a suboperação para rastrear no histórico
+        ref: 'Escala — ' + (d.operacao || d.operacaoFonte)
+      }, function(updated, err) {
+        if (err) console.error('[salvarEsc] falha ao gravar VRTE:', err);
         finalizarSalvar();
-      }
+      });
     });
   } catch (err) {
     console.error('[salvarEsc] erro:', err);

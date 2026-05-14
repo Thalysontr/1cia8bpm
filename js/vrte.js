@@ -265,6 +265,11 @@ function rVRTE() {
   if (typeof rCalendarioIseo === 'function') {
     try { rCalendarioIseo(); } catch (e) { console.error('[rVRTE] erro no calendário:', e); }
   }
+
+  // Reatribuição de operações órfãs (correção retroativa)
+  if (typeof rVrteReatrib === 'function') {
+    try { rVrteReatrib(); } catch (e) { console.error('[rVRTE] erro em reatribuir:', e); }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
