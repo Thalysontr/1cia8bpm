@@ -161,6 +161,129 @@ function aplicarReatribuicao(opOrfa, selectId) {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════
+// DIAGNÓSTICO DE INCONSISTÊNCIAS NO HISTÓRICO VRTE
+// ═══════════════════════════════════════════════════════════════
+//
+// Detecta saídas órfãs (sem escala ativa correspondente) — geralmente
+// ajustes antigos criados antes do refactor de upsertVrteSaidaEscala.
+//
+// USO no console:
+//   diagnosticarVRTE()              → mês atual
+//   diagnosticarVRTE('2026-05')     → mês específico
+//   limparVRTEEntries([ts1, ts2])   → remove entries pelos timestamps
+window.diagnosticarVRTE = function(yyyymm) {
+  yyyymm = yyyymm || new Date().toISOString().slice(0,7);
+  var hist = (APP.vrte && (APP.vrte.hist || APP.vrte.historico)) || [];
+  var entriesMes = hist.filter(function(h) {
+    return h && h.data && String(h.data).slice(0,7) === yyyymm;
+  });
+
+  var escsAtivas = {};
+  (APP.escs || []).forEach(function(e) {
+    if (e && e.id && !(e.cancelada === true || e.status === 'cancelada')) {
+      escsAtivas[e.id] = e;
+    }
+  });
+
+  var saidas = entriesMes.filter(function(h) { return h.tipo === 'saida'; });
+  var entradas = entriesMes.filter(function(h) { return h.tipo === 'entrada'; });
+
+  console.log('%c=== DIAGNÓSTICO VRTE — ' + yyyymm + ' ===', 'color:#1565c0;font-weight:bold;font-size:14px');
+  console.log('Total entries no mês:', entriesMes.length, '(' + saidas.length + ' saídas, ' + entradas.length + ' entradas)');
+
+  console.log('\n%cSAÍDAS:', 'color:#c62828;font-weight:bold');
+  console.table(saidas.map(function(h) {
+    var esc = h.escalaId && escsAtivas[h.escalaId];
+    var status;
+    if (esc) status = '✓ ATIVA (vrteTotal=' + (esc.vrteTotal||0) + ')';
+    else if (h.escalaId) status = '⚠ escalaId nao encontrado';
+    else status = '⚠ SEM escalaId (legacy)';
+    return {
+      ts: h.ts, data: h.data, tipoOp: h.tipoOp, qtd: h.qtd,
+      ref: (h.ref||'').slice(0,50), escalaId: h.escalaId || '-', status: status
+    };
+  }));
+
+  console.log('\n%cENTRADAS:', 'color:#2e7d32;font-weight:bold');
+  console.table(entradas.map(function(h) {
+    return { ts: h.ts, data: h.data, tipoOp: h.tipoOp, qtd: h.qtd, ref: (h.ref||'').slice(0,50) };
+  }));
+
+  console.log('\n%cTOTAL POR tipoOp (saídas):', 'color:#1565c0;font-weight:bold');
+  var porOp = {};
+  saidas.forEach(function(h) {
+    var k = h.tipoOp || '(vazio)';
+    porOp[k] = (porOp[k] || 0) + (h.qtd || 0);
+  });
+  console.table(porOp);
+
+  console.log('\n%cTOTAL POR escalaId (saídas):', 'color:#1565c0;font-weight:bold');
+  var porEsc = {};
+  saidas.forEach(function(h) {
+    var k = h.escalaId || '(sem escalaId)';
+    if (!porEsc[k]) porEsc[k] = { qtd: 0, count: 0, ativa: false, vrteTotal: 0 };
+    porEsc[k].qtd += (h.qtd || 0);
+    porEsc[k].count++;
+    if (escsAtivas[k]) {
+      porEsc[k].ativa = true;
+      porEsc[k].vrteTotal = escsAtivas[k].vrteTotal || 0;
+    }
+  });
+  console.table(porEsc);
+
+  // Detecta órfãs (sem escala ativa OU qtd diferente do vrteTotal da escala)
+  var orfas = saidas.filter(function(h) {
+    if (!h.escalaId) return true; // sem escalaId — legacy
+    var esc = escsAtivas[h.escalaId];
+    return !esc; // escala não existe (cancelada/excluída)
+  });
+
+  console.log('\n%c⚠ SAÍDAS ÓRFÃS (' + orfas.length + '):', 'color:#e65100;font-weight:bold');
+  console.log('Estas entries provavelmente são ajustes antigos ou de escalas excluídas.');
+  if (orfas.length) {
+    var tsParaLimpar = orfas.map(function(h) { return h.ts; });
+    console.log('Para remover todas: limparVRTEEntries(' + JSON.stringify(tsParaLimpar) + ')');
+    console.table(orfas.map(function(h) {
+      return { ts: h.ts, data: h.data, tipoOp: h.tipoOp, qtd: h.qtd, ref: (h.ref||'').slice(0,60) };
+    }));
+  }
+
+  return { saidas: saidas, entradas: entradas, orfas: orfas };
+};
+
+window.limparVRTEEntries = function(tsList) {
+  if (!Array.isArray(tsList) || !tsList.length) {
+    alert('Use: limparVRTEEntries([1234567890, 9876543210])');
+    return;
+  }
+  if (!confirm('Remover ' + tsList.length + ' entry(ies) do histórico VRTE?\nEsta ação não pode ser desfeita.')) return;
+
+  var hist = (APP.vrte && (APP.vrte.hist || APP.vrte.historico) || []).slice();
+  var antes = hist.length;
+  hist = hist.filter(function(h) { return tsList.indexOf(h.ts) === -1; });
+  var removidos = antes - hist.length;
+
+  // Recalcula saldo do zero
+  var ordenado = hist.slice().sort(function(a, b) { return (a.ts || 0) - (b.ts || 0); });
+  var saldo = 0;
+  ordenado.forEach(function(h) {
+    if (h.tipo === 'entrada')      saldo += (h.qtd || 0);
+    else if (h.tipo === 'saida')   saldo -= (h.qtd || 0);
+    h.saldoApos = saldo;
+  });
+
+  DB.saveVrte({ saldo: saldo, hist: ordenado, historico: ordenado }, function() {
+    if (typeof reloadVrte === 'function') {
+      reloadVrte(function() {
+        if (typeof rVRTE === 'function') rVRTE();
+        if (typeof rPainel === 'function') rPainel();
+        alert('✓ Removidos ' + removidos + ' entry(ies).\nNovo saldo: ' + saldo + ' VRTE');
+      });
+    }
+  });
+};
+
 function _reatribuirFinalizar(qtdMovs, qtdEscs, novaOp) {
   // Recarrega caches
   if (typeof reloadVrte === 'function') reloadVrte(function() {
