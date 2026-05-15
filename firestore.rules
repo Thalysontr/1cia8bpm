@@ -4,8 +4,17 @@ service cloud.firestore {
 
     function isAuth()        { return request.auth != null; }
     function isAdmin()       { return isAuth() && request.auth.token.role == 'admin'; }
+    function isComandante()  { return isAuth() && request.auth.token.role == 'comandante'; }
+    function isOperador()    { return isAuth() && request.auth.token.role == 'operador'; }
+    function isVisualizador(){ return isAuth() && request.auth.token.role == 'visualizador'; }
+    // Compat: roles legados (admin/colaborador antigos)
     function isColaborador() { return isAuth() && request.auth.token.role == 'colaborador'; }
-    function isUser()        { return isAdmin() || isColaborador(); }
+    // isUser = qualquer um dos roles válidos (acesso de leitura/operação básica)
+    function isUser()        { return isAdmin() || isComandante() || isOperador() || isVisualizador() || isColaborador(); }
+    // canEdit = quem pode escrever dados operacionais (não inclui visualizador)
+    function canEdit()       { return isAdmin() || isComandante() || isOperador() || isColaborador(); }
+    // canManage = quem pode fazer ações de gestão (admin, comandante)
+    function canManage()     { return isAdmin() || isComandante(); }
 
     // Multi-tenant: usuário pode acessar a companhia?
     // Custom Claim opcional `companhias`: lista de IDs permitidos.
@@ -26,42 +35,49 @@ service cloud.firestore {
       allow write: if isAdmin();        // só admin cria/edita metadata
 
       // Militares da companhia
+      // Read: qualquer usuário autenticado da companhia
+      // Write: Admin ou Comandante (operadores/visualizadores não cadastram)
       match /mils/{docId} {
         allow read:  if isUser() && canAccessCia(cid);
-        allow write: if isAdmin() && canAccessCia(cid);
+        allow write: if canManage() && canAccessCia(cid);
       }
 
       // Operações
+      // Read/create/update: qualquer não-visualizador
+      // Delete: só admin
       match /ops/{docId} {
         allow read:   if isUser() && canAccessCia(cid);
-        allow create: if isUser() && canAccessCia(cid);
-        allow update: if isUser() && canAccessCia(cid);
+        allow create: if canEdit() && canAccessCia(cid);
+        allow update: if canEdit() && canAccessCia(cid);
         allow delete: if isAdmin() && canAccessCia(cid);
       }
 
       // Escalas
+      // Create/update: qualquer não-visualizador (admin/cmt/operador)
+      // Delete (cancelar): só admin/comandante
       match /escalas/{docId} {
         allow read:   if isUser() && canAccessCia(cid);
-        allow create: if isUser() && canAccessCia(cid);
-        allow update: if isUser() && canAccessCia(cid);
-        allow delete: if isAdmin() && canAccessCia(cid);
+        allow create: if canEdit() && canAccessCia(cid);
+        allow update: if canEdit() && canAccessCia(cid);
+        allow delete: if canManage() && canAccessCia(cid);
       }
 
-      // Dispensas
+      // Dispensas: criar/editar/excluir qualquer não-visualizador
       match /dispensas/{docId} {
         allow read:  if isUser() && canAccessCia(cid);
-        allow write: if isUser() && canAccessCia(cid);
+        allow write: if canEdit() && canAccessCia(cid);
       }
 
-      // Configs (vrte, usuarios, assinantes, anexo_visitas, ultimo_assinante)
+      // Configs (usuarios, assinantes, anexo_visitas, ultimo_assinante)
+      // Read: qualquer da companhia. Write: admin/comandante
       match /config/{docId} {
         allow read:  if isUser() && canAccessCia(cid);
-        allow write: if isAdmin() && canAccessCia(cid);
+        allow write: if canManage() && canAccessCia(cid);
       }
-      // VRTE pode ser escrito por qualquer usuário (registro de entradas/saídas)
+      // VRTE pode ser escrito por qualquer não-visualizador
       match /config/vrte {
         allow read:  if isUser() && canAccessCia(cid);
-        allow write: if isUser() && canAccessCia(cid);
+        allow write: if canEdit() && canAccessCia(cid);
       }
     }
 
@@ -71,35 +87,35 @@ service cloud.firestore {
     // ════════════════════════════════════════════════════════════
     match /mils/{docId} {
       allow read: if isUser();
-      allow write: if isAdmin();
+      allow write: if canManage();
     }
     match /ops/{docId} {
       allow read:   if isUser();
-      allow create: if isUser();
-      allow update: if isUser();
+      allow create: if canEdit();
+      allow update: if canEdit();
       allow delete: if isAdmin();
     }
     match /escalas/{docId} {
       allow read:   if isUser();
-      allow create: if isUser();
-      allow update: if isUser();
-      allow delete: if isAdmin();
+      allow create: if canEdit();
+      allow update: if canEdit();
+      allow delete: if canManage();
     }
     match /dispensas/{docId} {
       allow read:  if isUser();
-      allow write: if isUser();
+      allow write: if canEdit();
     }
     match /config/vrte {
       allow read:  if isUser();
-      allow write: if isUser();
+      allow write: if canEdit();
     }
     match /config/anexo_visitas {
       allow read:  if isUser();
-      allow write: if isAdmin();
+      allow write: if canManage();
     }
     match /config/usuarios    { allow read: if isAuth(); allow write: if isAdmin(); }
-    match /config/assinantes  { allow read, write: if isAdmin(); }
-    match /config/ultimo_assinante { allow read: if isUser(); allow write: if isAdmin(); }
+    match /config/assinantes  { allow read: if isUser(); allow write: if canManage(); }
+    match /config/ultimo_assinante { allow read: if isUser(); allow write: if canManage(); }
 
     // ════════════════════════════════════════════════════════════
     // GLOBAIS (não particionadas por companhia)
