@@ -75,7 +75,10 @@ function login() {
     _logAcesso(cred.user.uid, 'login');
     return cred.user.getIdTokenResult().then(function(result) {
       var role = result.claims.role || 'colaborador';
-      CU = { uid: cred.user.uid, u: u, r: role, email: cred.user.email };
+      var companhias = (Array.isArray(result.claims.companhias) && result.claims.companhias.length)
+        ? result.claims.companhias
+        : (role === 'admin' ? ['1cia8bpm','forcatatica'] : ['1cia8bpm']); // fallback compat
+      CU = { uid: cred.user.uid, u: u, r: role, email: cred.user.email, companhias: companhias };
       _entrarNoApp();
     });
   }).catch(function(e) {
@@ -165,7 +168,10 @@ FBAUTH.onAuthStateChanged(function(user) {
     user.getIdTokenResult().then(function(result) {
       var nome = user.email.replace(EMAIL_DOMAIN, '');
       var role = result.claims.role || 'colaborador';
-      CU = { uid: user.uid, u: nome, r: role, email: user.email };
+      var companhias = (Array.isArray(result.claims.companhias) && result.claims.companhias.length)
+        ? result.claims.companhias
+        : (role === 'admin' ? ['1cia8bpm','forcatatica'] : ['1cia8bpm']);
+      CU = { uid: user.uid, u: nome, r: role, email: user.email, companhias: companhias };
       _entrarNoApp();
     });
   }

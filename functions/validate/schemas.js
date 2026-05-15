@@ -33,7 +33,21 @@ function validateUser(d) {
   if (!d.u || typeof d.u !== 'string' || d.u.trim().length < 2) return err('Usuário inválido');
   if (!d.p || typeof d.p !== 'string' || d.p.length < 6)        return err('Senha deve ter no mínimo 6 caracteres');
   if (!['admin','colaborador'].includes(d.r))                    return err('Role inválida');
+  if (d.companhias !== undefined) {
+    if (!Array.isArray(d.companhias) || !d.companhias.length)    return err('Selecione ao menos uma companhia');
+    if (!d.companhias.every(c => typeof c === 'string' && c.length)) return err('Lista de companhias inválida');
+  }
   return ok();
 }
 
-module.exports = { validateMilitar, validateOperacao, validateEscala, validateDispensa, validateUser };
+function validateUserUpdate(d) {
+  if (!d.u || typeof d.u !== 'string' || d.u.trim().length < 2) return err('Usuário inválido');
+  if (d.r !== undefined && !['admin','colaborador'].includes(d.r)) return err('Role inválida');
+  if (d.companhias !== undefined) {
+    if (!Array.isArray(d.companhias) || !d.companhias.length)    return err('Selecione ao menos uma companhia');
+    if (!d.companhias.every(c => typeof c === 'string' && c.length)) return err('Lista de companhias inválida');
+  }
+  return ok();
+}
+
+module.exports = { validateMilitar, validateOperacao, validateEscala, validateDispensa, validateUser, validateUserUpdate };

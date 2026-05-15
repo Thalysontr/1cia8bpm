@@ -21,6 +21,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
 
 <!-- Estilos -->
 <link rel="stylesheet" href="css/styles.css"/>
@@ -541,14 +542,28 @@
       <!-- CONFIG -->
       <div id="pc" class="panel">
         <div class="ph"><div class="pt">Configurações</div><div class="ps">Usuários, assinantes e dados</div></div>
-        <div class="card"><div class="ch"><span class="ct">Usuários do sistema</span></div>
+        <div class="card"><div class="ch"><span class="ct" id="user-form-title">Cadastrar usuário</span></div>
           <div class="fr">
-            <div class="fg"><label>Novo usuário</label><input type="text" id="cu" placeholder="Nome de usuário"/></div>
-            <div class="fg"><label>Senha</label><input type="password" id="cp" placeholder="Senha"/></div>
+            <div class="fg"><label>Nome de usuário</label><input type="text" id="cu" placeholder="ex: jsilva"/></div>
+            <div class="fg"><label>Senha <span style="font-size:10px;color:var(--t2)">(mínimo 6 caracteres)</span></label><input type="password" id="cp" placeholder="Senha"/></div>
           </div>
-          <div class="fg"><label>Perfil</label><select id="cpe"><option value="admin">Administrador</option><option value="colaborador">Colaborador</option></select></div>
+          <div class="fr">
+            <div class="fg"><label>Perfil</label>
+              <select id="cpe">
+                <option value="colaborador">Colaborador</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label>Acesso às companhias</label>
+              <div id="user-companhias-box" style="display:flex;flex-direction:column;gap:6px;padding:8px 10px;background:var(--s2);border-radius:var(--r);border:1px solid var(--b)">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="user-cia-1cia8bpm" value="1cia8bpm" checked/> <span>1ª Companhia / 8º BPM</span></label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="user-cia-forcatatica" value="forcatatica"/> <span>Força Tática / 8º BPM</span></label>
+              </div>
+            </div>
+          </div>
           <div class="alert aok" id="ca">Usuário criado!</div>
-          <div class="ar2"><button class="btn bp" onclick="criarUser()">Criar usuário</button></div>
+          <div class="ar2" id="user-form-acoes"><button class="btn bp" onclick="criarUser()">Criar usuário</button></div>
           <hr class="div"/>
           <div id="ul2"></div>
         </div>

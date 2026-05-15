@@ -111,6 +111,12 @@ service cloud.firestore {
       allow read:  if isAdmin();
       allow write: if isAuth();
     }
+    // Sistema: usuários globais (com lista de companhias permitidas em Custom Claims)
+    // Qualquer autenticado pode LER (sem senhas, só metadados). Só admin escreve.
+    match /sistema/{docId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
 
     // Bloquear tudo que não foi explicitamente liberado
     match /{document=**} {

@@ -326,18 +326,26 @@ var DB = {
     });
   },
 
-  // ── USUÁRIOS ─────────────────────────────────────────────────
+  // ── USUÁRIOS (GLOBAL — fora do multi-tenant) ─────────────────
+  // Usuários do sistema vivem em /sistema/usuarios.list (raiz, NÃO
+  // particionado por companhia). Cada item: {uid, u, r, companhias: []}
+  // A lista de companhias permitidas vive no Custom Claim do Firebase Auth.
   getUsers: function(cb) {
     if (_CACHE.users) { cb(_CACHE.users); return; }
-    _colC('config').doc('usuarios').get().then(function(doc) {
-      var users = doc.exists ? doc.data().list : [];
+    FBDB.collection('sistema').doc('usuarios').get().then(function(doc) {
+      var users = doc.exists ? (doc.data().list || []) : [];
       _CACHE.users = users;
       cb(users);
+    }).catch(function(e) {
+      console.warn('[DB.getUsers] erro:', e);
+      _CACHE.users = [];
+      cb([]);
     });
   },
 
+  // (Mantido por compat — escrita normalmente é via Cloud Function `createUser`/`updateUser`)
   saveUsers: function(users, cb) {
-    _colC('config').doc('usuarios').set(_stripUndefined({list: users})).then(function() {
+    FBDB.collection('sistema').doc('usuarios').set(_stripUndefined({list: users})).then(function() {
       _CACHE.users = users;
       if (cb) cb();
     });
