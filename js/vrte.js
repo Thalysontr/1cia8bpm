@@ -248,7 +248,9 @@ function rVRTE() {
           '<td style="font-size:11px">' + esc(h.tipoOp || '—') + '</td>' +
           '<td style="font-size:11px;color:var(--t2)">' + esc(h.ref || '—') + '</td>' +
           '<td style="text-align:center">' +
-            '<button class="btn brd bsm" onclick="excluirLancamentoVRTE(' + tsSafe + ')" title="Excluir este lançamento">×</button>' +
+            ((typeof can === 'function' && can('excluir_vrte'))
+              ? '<button class="btn brd bsm" onclick="excluirLancamentoVRTE(' + tsSafe + ')" title="Excluir este lançamento">×</button>'
+              : '<span style="color:var(--t3);font-size:10px">—</span>') +
           '</td>' +
         '</tr>';
       }).join('');
@@ -301,6 +303,7 @@ function _selecionarOpVRTE(id) {
 // REGISTRAR ENTRADA (callback)
 // ═══════════════════════════════════════════════════════════════
 function regVRTE() {
+  if (typeof requireCan === 'function' && !requireCan('registrar_vrte')) return;
   var dataEl = document.getElementById('vd');
   var qtdEl = document.getElementById('vq');
   var obsEl = document.getElementById('vo');
@@ -356,6 +359,7 @@ function regVRTE() {
 // EXCLUIR LANÇAMENTO INDIVIDUAL (com recálculo do saldo)
 // ═══════════════════════════════════════════════════════════════
 function excluirLancamentoVRTE(ts) {
+  if (typeof requireCan === 'function' && !requireCan('excluir_vrte')) return;
   var v = APP.vrte || { saldo: 0, hist: [] };
   var hist = _getHist(v).slice();
 

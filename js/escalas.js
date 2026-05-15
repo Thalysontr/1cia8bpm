@@ -118,14 +118,19 @@ function rEscs() {
       ? '<span class="badge brd">Cancelada</span>'
       : '';
 
-    var acoes = cancelada
-      ? '<span style="color:var(--t3)">—</span>'
-      : '<div style="display:flex;gap:4px;flex-wrap:wrap">' +
-        '<button class="btn bsm" onclick="baixarPDFEscala(\'' + idSafe + '\')" title="Baixar PDF">📄 PDF</button>' +
-        '<button class="btn bsm" onclick="baixarDocxEscala(\'' + idSafe + '\')" title="Baixar DOCX">📝 DOCX</button>' +
-        '<button class="btn bsm" onclick="editarEscala(\'' + idSafe + '\')" title="Editar esta escala" style="background:#1565c0;color:#fff">✏ Editar</button>' +
-        '<button class="btn brd bsm" onclick="cancelarEscala(\'' + idSafe + '\')" title="Cancelar e estornar VRTE">× Cancelar</button>' +
-        '</div>';
+    var podeEditar = (typeof can === 'function' && can('editar_escala'));
+    var podeCancelar = (typeof can === 'function' && can('cancelar_escala'));
+    var acoesHtml = '<div style="display:flex;gap:4px;flex-wrap:wrap">' +
+      '<button class="btn bsm" onclick="baixarPDFEscala(\'' + idSafe + '\')" title="Baixar PDF">📄 PDF</button>' +
+      '<button class="btn bsm" onclick="baixarDocxEscala(\'' + idSafe + '\')" title="Baixar DOCX">📝 DOCX</button>';
+    if (podeEditar) {
+      acoesHtml += '<button class="btn bsm" onclick="editarEscala(\'' + idSafe + '\')" title="Editar esta escala" style="background:#1565c0;color:#fff">✏ Editar</button>';
+    }
+    if (podeCancelar) {
+      acoesHtml += '<button class="btn brd bsm" onclick="cancelarEscala(\'' + idSafe + '\')" title="Cancelar e estornar VRTE">× Cancelar</button>';
+    }
+    acoesHtml += '</div>';
+    var acoes = cancelada ? '<span style="color:var(--t3)">—</span>' : acoesHtml;
 
     return '<tr' + (cancelada ? ' style="opacity:.55"' : '') + '>' +
       '<td>' + (typeof fd === 'function' ? fd(e.data) : (e.data || '—')) + '</td>' +
@@ -210,6 +215,7 @@ function _corOperacao(op) {
 // CANCELAR ESCALA — estorna VRTE
 // ═══════════════════════════════════════════════════════════════
 function cancelarEscala(id) {
+  if (typeof requireCan === 'function' && !requireCan('cancelar_escala')) return;
   var escala = (APP.escs || []).find(function(e) { return e.id === id; });
   if (!escala) {
     alert('Escala não encontrada.');

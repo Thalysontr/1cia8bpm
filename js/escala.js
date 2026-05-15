@@ -971,6 +971,10 @@ function limparEsc() {
 // ═══════════════════════════════════════════════════════════════
 function salvarEsc() {
   console.log('[salvarEsc] iniciando...');
+  // Permissão
+  var isEditando = !!_editandoEscalaId;
+  var acao = isEditando ? 'editar_escala' : 'criar_escala';
+  if (typeof requireCan === 'function' && !requireCan(acao)) return;
   var d = getEscData();
   console.log('[salvarEsc] dados coletados:', d);
 
@@ -1103,6 +1107,7 @@ function salvarEsc() {
 // EDITAR ESCALA — carrega dados de uma escala existente no form "Nova Escala"
 // ═══════════════════════════════════════════════════════════════
 function editarEscala(id) {
+  if (typeof requireCan === 'function' && !requireCan('editar_escala')) return;
   var escala = (APP.escs || []).find(function(e) { return e.id === id; });
   if (!escala) { alert('Escala não encontrada.'); return; }
   if (escala.cancelada || escala.status === 'cancelada') {

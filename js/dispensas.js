@@ -712,6 +712,7 @@ function _rListaDisp() {
 // FORM — ABRIR / FECHAR / PREENCHER
 // ═══════════════════════════════════════════════════════════════
 function _abrirFormDisp() {
+  if (typeof requireCan === 'function' && !requireCan('cadastrar_dispensa')) return;
   _dEditId = null;
   document.getElementById('disp-modal-titulo').textContent = 'Nova Dispensa';
   var hoje = new Date();
@@ -856,6 +857,7 @@ function _salvarFormDisp() {
 // EXCLUIR
 // ═══════════════════════════════════════════════════════════════
 function _delDisp(edocs, nome) {
+  if (typeof requireCan === 'function' && !requireCan('excluir_dispensa')) return;
   if (!confirm('Excluir dispensa de ' + nome + ' (' + edocs + ')?')) return;
   DB.deleteDisp(edocs, function(){
     reloadDisp(function(){ rDisp(); });

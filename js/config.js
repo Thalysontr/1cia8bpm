@@ -91,6 +91,7 @@ function _resetUserForm() {
 // CRIAR USUÁRIO (via Cloud Function)
 // ═══════════════════════════════════════════════════════════════
 function criarUser(){
+  if (typeof requireCan === 'function' && !requireCan('gerenciar_usuarios')) return;
   var u = document.getElementById('cu').value.trim();
   var p = document.getElementById('cp').value;
   var r = document.getElementById('cpe').value;
@@ -121,6 +122,7 @@ function criarUser(){
 // EDITAR USUÁRIO (via Cloud Function updateUser)
 // ═══════════════════════════════════════════════════════════════
 function editarUser(uName) {
+  if (typeof requireCan === 'function' && !requireCan('gerenciar_usuarios')) return;
   var u = (APP.users || []).find(function(x) { return x.u === uName; });
   if (!u) { alert('Usuário não encontrado.'); return; }
 
@@ -177,6 +179,7 @@ function salvarEdicaoUser() {
 // EXCLUIR USUÁRIO (via Cloud Function deleteUser)
 // ═══════════════════════════════════════════════════════════════
 function delUser(uName){
+  if (typeof requireCan === 'function' && !requireCan('gerenciar_usuarios')) return;
   if(!confirm('Excluir usuário "' + uName + '"?\n\nEle será removido do Firebase Auth e não poderá mais fazer login.'))return;
 
   var deleteUserFn = firebase.functions().httpsCallable('deleteUser');
@@ -215,10 +218,12 @@ function delAss(i){
 // EXPORTAR / LIMPAR
 // ═══════════════════════════════════════════════════════════════
 function exportar(){
+  if (typeof requireCan === 'function' && !requireCan('exportar_dados')) return;
   var b=new Blob([JSON.stringify({mils:APP.mils,ops:APP.ops,escs:APP.escs,vrte:APP.vrte,assinantes:APP.assinantes},null,2)],{type:'application/json'});
   var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='backup_iseo_'+new Date().toISOString().split('T')[0]+'.json';a.click();
 }
 function limpar(){
+  if (typeof requireCan === 'function' && !requireCan('limpar_dados')) return;
   if(!confirm('Apagar TODOS os dados desta companhia no Firestore? Não pode ser desfeito.'))return;
   if(!confirm('CONFIRMA? Esta ação é irreversível.'))return;
   ['mils','ops','escalas','dispensas'].forEach(function(col){

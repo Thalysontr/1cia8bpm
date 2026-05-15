@@ -548,10 +548,12 @@
             <div class="fg"><label>Senha <span style="font-size:10px;color:var(--t2)">(mínimo 6 caracteres)</span></label><input type="password" id="cp" placeholder="Senha"/></div>
           </div>
           <div class="fr">
-            <div class="fg"><label>Perfil</label>
+            <div class="fg"><label>Função</label>
               <select id="cpe">
-                <option value="colaborador">Colaborador</option>
-                <option value="admin">Administrador</option>
+                <option value="visualizador">Visualizador — só leitura</option>
+                <option value="operador" selected>Operador — cria escalas e VRTE</option>
+                <option value="comandante">Comandante — acesso operacional total</option>
+                <option value="admin">Administrador — gestão técnica</option>
               </select>
             </div>
             <div class="fg">
@@ -614,6 +616,9 @@ var TMPL_B64="UEsDBBQAAAAIAIFdlVzJf3/HuAEAABMJAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbL
 
 <!-- 3. Utilitários (tipoEscala, badgeTipo, fd, esc, show) -->
 <script src="js/utils.js"></script>
+
+<!-- 3.5. Sistema de permissões (roles + can() helper) -->
+<script src="js/permissoes.js"></script>
 
 <!-- 4. Autenticação -->
 <script src="js/auth.js"></script>

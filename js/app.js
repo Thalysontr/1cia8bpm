@@ -72,6 +72,61 @@ function _appPronto() {
   initTurnos();
   updSelOp();
   updSelAss();
+  // Aplica restrições de UI baseado no role do usuário atual
+  if (typeof aplicarPermissoesUI === 'function') aplicarPermissoesUI();
+}
+
+// ─── Aplica permissões na UI ─────────────────────────────────────
+// Esconde itens da sidebar e elementos que o usuário não pode acessar.
+function aplicarPermissoesUI() {
+  if (typeof can !== 'function') return;
+
+  // Itens da sidebar (ni[onclick="nav('XXX', this)"])
+  function _hideNav(id, mostrar) {
+    var el = document.querySelector('.ni[onclick*="nav(\'' + id + '\'"]');
+    if (el) el.style.display = mostrar ? '' : 'none';
+  }
+  _hideNav('nova',       can('criar_escala'));
+  _hideNav('cfg',        can('gerenciar_usuarios'));
+  _hideNav('ops',        can('cadastrar_operacao') || can('ver_painel')); // Operações: todos veem
+
+  // Form de cadastrar militar — esconde para quem não pode cadastrar
+  var cardCadastrarMil = document.querySelector('#pm > .card:first-of-type');
+  // Acima é o .ph; o primeiro card é o de cadastro. Ajuste:
+  cardCadastrarMil = document.getElementById('mpo');
+  if (cardCadastrarMil) {
+    var cardWrapper = cardCadastrarMil.closest('.card');
+    if (cardWrapper) cardWrapper.style.display = can('cadastrar_militar') ? '' : 'none';
+  }
+
+  // Form de Registrar entrada de VRTE — esconde se não pode
+  var formVrte = document.getElementById('vd');
+  if (formVrte) {
+    var cardVrteEntrada = formVrte.closest('.card');
+    if (cardVrteEntrada) cardVrteEntrada.style.display = can('registrar_vrte') ? '' : 'none';
+  }
+
+  // Card de Reatribuir Operação Fonte — só admin
+  var reatribCard = document.getElementById('vrte-reatrib-card');
+  if (reatribCard && !can('reatribuir_vrte')) reatribCard.style.display = 'none';
+
+  // Form de cadastrar Operação — esconde se não pode
+  var formOp = document.getElementById('on');
+  if (formOp) {
+    var cardOp = formOp.closest('.card');
+    if (cardOp) cardOp.style.display = can('cadastrar_operacao') ? '' : 'none';
+  }
+
+  // Indicador do role atual no topo (badge ao lado do nome)
+  var tbu = document.getElementById('tbu');
+  if (tbu && typeof CU !== 'undefined' && CU) {
+    var nomeRole = (typeof roleNome === 'function') ? roleNome(CU.r) : CU.r;
+    var corRole  = (typeof roleCor === 'function') ? roleCor(CU.r) : '#888';
+    tbu.innerHTML = esc(CU.u) +
+      ' <span style="display:inline-block;background:' + corRole + '20;color:' + corRole +
+      ';border:1px solid ' + corRole + '40;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;margin-left:4px">' +
+      esc(nomeRole) + '</span>';
+  }
 }
 
 // ─── Funções de recarga por módulo (chamadas após salvar) ────────

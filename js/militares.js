@@ -73,6 +73,15 @@ function rMils(){
     }).join(' · ');
     var ngHtml = m.nomeGuerra ? '<strong>'+m.nomeGuerra+'</strong> · ' : '';
     var rgSafe = (m.rg || '').replace(/'/g, "\\'");
+    var podeEditar = (typeof can === 'function' && can('editar_militar'));
+    var podeExcluir = (typeof can === 'function' && can('excluir_militar'));
+    var btnsHtml = '';
+    if (podeEditar) {
+      btnsHtml += '<button class="btn bsm" onclick="editarMil(\''+rgSafe+'\')" title="Editar dados deste militar" style="background:#1565c0;color:#fff">✏ Editar</button>';
+    }
+    if (podeExcluir) {
+      btnsHtml += '<button class="btn bsm brd" onclick="delMilRg(this)" data-rg="'+m.rg+'" title="Excluir militar">× Excluir</button>';
+    }
     return '<div class="mrow2">'
       +'<div class="av">'+av+'</div>'
       +'<div style="flex:1">'
@@ -87,10 +96,7 @@ function rMils(){
         +'</div>'
         +'<span class="ec" style="font-size:11px">'+h.length+' total</span>'
       +'</div>'
-      +'<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'
-        +'<button class="btn bsm" onclick="editarMil(\''+rgSafe+'\')" title="Editar dados deste militar" style="background:#1565c0;color:#fff">✏ Editar</button>'
-        +'<button class="btn bsm brd" onclick="delMilRg(this)" data-rg="'+m.rg+'" title="Excluir militar">× Excluir</button>'
-      +'</div>'
+      + (btnsHtml ? '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'+btnsHtml+'</div>' : '')
       +'</div>';
   }).join('');
   if(!fil.length)el.innerHTML='<div class="empty">Nenhum militar encontrado.</div>';
@@ -111,6 +117,10 @@ function salvarMil(){
   if(!no||!rg)return alert('Preencha nome e RG.');
 
   var isEdit = !!_editandoMilRg;
+
+  // Permissão
+  var acao = isEdit ? 'editar_militar' : 'cadastrar_militar';
+  if (typeof requireCan === 'function' && !requireCan(acao)) return;
 
   if (isEdit) {
     // ─── MODO EDIÇÃO ───
@@ -253,12 +263,14 @@ function _renderBotaoMilForm(isEdit, m) {
 }
 
 function delMilRg(btn){
+  if (typeof requireCan === 'function' && !requireCan('excluir_militar')) return;
   var rg=btn.getAttribute('data-rg');
   if(!confirm('Excluir?'))return;
   DB.deleteMil(rg,function(){ reloadMils(function(){ rMils(); }); });
 }
 
 function delMil(rg){
+  if (typeof requireCan === 'function' && !requireCan('excluir_militar')) return;
   if(!confirm('Excluir?'))return;
   DB.deleteMil(rg,function(){ reloadMils(function(){ rMils(); }); });
 }
