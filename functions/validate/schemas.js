@@ -42,7 +42,7 @@ function validateUser(d) {
 
 function validateUserUpdate(d) {
   if (!d.u || typeof d.u !== 'string' || d.u.trim().length < 2) return err('Usuário inválido');
-  if (d.r !== undefined && !['admin','colaborador'].includes(d.r)) return err('Role inválida');
+  if (d.r !== undefined && !['admin','comandante','operador','visualizador','colaborador'].includes(d.r)) return err('Função inválida');
   if (d.companhias !== undefined) {
     if (!Array.isArray(d.companhias) || !d.companhias.length)    return err('Selecione ao menos uma companhia');
     if (!d.companhias.every(c => typeof c === 'string' && c.length)) return err('Lista de companhias inválida');
