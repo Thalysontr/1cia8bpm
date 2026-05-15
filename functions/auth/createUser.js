@@ -51,27 +51,51 @@ exports.createUser = functions.https.onCall(async (data, context) => {
 
   const email = u.trim().toLowerCase() + EMAIL_DOMAIN;
 
+  let record = null;
   try {
-    const record = await admin.auth().createUser({ email, password: p, displayName: u });
+    console.log('[createUser] criando no Firebase Auth:', email);
+    record = await admin.auth().createUser({ email, password: p, displayName: u });
+    console.log('[createUser] uid criado:', record.uid);
+  } catch (e) {
+    console.error('[createUser] erro Firebase Auth:', e.code, e.message);
+    if (e.code === 'auth/email-already-exists') {
+      throw new functions.https.HttpsError('already-exists', 'Usuário "' + u + '" já existe.');
+    }
+    if (e.code === 'auth/weak-password') {
+      throw new functions.https.HttpsError('invalid-argument', 'Senha muito fraca: ' + e.message);
+    }
+    if (e.code === 'auth/invalid-email') {
+      throw new functions.https.HttpsError('invalid-argument', 'Email inválido: ' + email);
+    }
+    throw new functions.https.HttpsError('internal', 'Auth: ' + (e.code || '') + ' — ' + e.message);
+  }
+
+  try {
+    console.log('[createUser] setando custom claims:', { role: r, companhias });
     await admin.auth().setCustomUserClaims(record.uid, {
       role: r,
       companhias: companhias
     });
+  } catch (e) {
+    console.error('[createUser] erro setCustomUserClaims:', e.code, e.message);
+    throw new functions.https.HttpsError('internal', 'Claims: ' + e.message);
+  }
 
+  try {
+    console.log('[createUser] salvando em /sistema/usuarios');
     await _upsertUserNaLista(admin.firestore(), {
       uid: record.uid,
       u: u.trim().toLowerCase(),
       r: r,
       companhias: companhias
     });
-
-    return { uid: record.uid, email, companhias };
   } catch (e) {
-    if (e.code === 'auth/email-already-exists') {
-      throw new functions.https.HttpsError('already-exists', 'Usuário já existe.');
-    }
-    throw new functions.https.HttpsError('internal', 'Erro ao criar usuário: ' + e.message);
+    console.error('[createUser] erro upsert lista:', e.code, e.message);
+    throw new functions.https.HttpsError('internal', 'Lista: ' + e.message);
   }
+
+  console.log('[createUser] OK:', { uid: record.uid, email, role: r, companhias });
+  return { uid: record.uid, email, companhias };
 });
 
 // ─── updateUser ───────────────────────────────────────────────────
