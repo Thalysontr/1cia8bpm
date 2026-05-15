@@ -28,8 +28,10 @@ var _COMPANHIAS_PADRAO = {
     sigla: '1ª CIA',
     sublinha: '8º BPM · Colatina',
     municipioPadrao: 'Colatina / ES',
-    logoVar: 'LOGO_8BPM_B64', // referência no escopo global
-    cor: '#1a3a5c'
+    logoVar: 'LOGO_8BPM_B64',  // referência no escopo global
+    cor: '#1a3a5c',
+    topbarBrand: '8º BPM · 1ª CIA',
+    topbarTitle: 'Sistema 1ª Cia do 8º BPM'
   },
   'forcatatica': {
     id: 'forcatatica',
@@ -38,7 +40,9 @@ var _COMPANHIAS_PADRAO = {
     sublinha: '8º BPM · Colatina / Baixo Guandu / Pancas',
     municipioPadrao: 'Colatina / ES',
     logoVar: 'LOGO_FT_B64',
-    cor: '#c62828'
+    cor: '#c62828',
+    topbarBrand: '8º BPM · FT',
+    topbarTitle: 'Sistema da Força Tática do 8º BPM'
   }
 };
 
@@ -190,11 +194,15 @@ function sairDoSeletor() {
   }
 }
 
-// Atualiza o header da sidebar com a companhia atual + mostra/esconde o
-// botão "trocar" baseado em quantas companhias o usuário tem acesso.
+// Atualiza TODA a UI com base na companhia ativa:
+// - sidebar: logo, nome, sublinha, botão trocar
+// - topbar: brand (lado esquerdo) e título (centro)
+// - title da aba do navegador
 function atualizarUICompanhia() {
   var c = getCompanhiaAtual();
   if (!c) return;
+
+  // ─── Sidebar header ───
   var nome = document.getElementById('sb-cia-nome');
   var sub  = document.getElementById('sb-cia-sub');
   var btn  = document.getElementById('sb-trocar-cia');
@@ -205,6 +213,19 @@ function atualizarUICompanhia() {
     btn.style.display = acessiveis.length > 1 ? '' : 'none';
   }
 
-  // Atualiza title da aba do navegador
+  // ─── Logo da sidebar (canto superior esquerdo) ───
+  var logoImg = document.getElementById('sb-logo-img');
+  if (logoImg && c.logoVar && window[c.logoVar]) {
+    logoImg.src = window[c.logoVar];
+    logoImg.alt = c.sigla || c.nome;
+  }
+
+  // ─── Topbar (lado direito da sidebar) ───
+  var tbd = document.getElementById('tbd');
+  var tbt = document.getElementById('tbt');
+  if (tbd) tbd.textContent = c.topbarBrand || ('8º BPM · ' + (c.sigla || ''));
+  if (tbt) tbt.textContent = c.topbarTitle || ('Sistema ' + (c.sigla || ''));
+
+  // ─── Title da aba do navegador ───
   if (c.nome) document.title = c.nome + ' — Sistema ISEO';
 }
