@@ -108,4 +108,103 @@ function initCompanhia() {
     _salvarCompanhiaAtual(APP.companhiaId);
   }
   console.log('[companhia] inicializada como:', APP.companhiaId);
+
+  // Atualiza UI da sidebar
+  atualizarUICompanhia();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SELETOR DE COMPANHIA (tela entre login e app)
+// ═══════════════════════════════════════════════════════════════
+
+// Renderiza o seletor com cards das companhias acessíveis ao usuário
+function renderSeletorCompanhia() {
+  var box = document.getElementById('cs-cards');
+  if (!box) return;
+
+  // Atualiza nome do usuário no cabeçalho
+  var nomeEl = document.getElementById('cs-nome-usuario');
+  if (nomeEl && typeof CU !== 'undefined' && CU) {
+    nomeEl.textContent = CU.u || 'admin';
+  }
+
+  var acessiveis = getCompanhiasDoUsuario();
+  if (!acessiveis.length) {
+    box.innerHTML = '<div style="color:#c62828;text-align:center">Você não tem acesso a nenhuma companhia. Contate o administrador.</div>';
+    return;
+  }
+
+  box.innerHTML = acessiveis.map(function(id) {
+    var c = _COMPANHIAS_PADRAO[id];
+    if (!c) return '';
+    var logoSrc = (window[c.logoVar] || '');
+    var logoHtml = logoSrc
+      ? '<img src="' + logoSrc + '" style="width:80px;height:80px;object-fit:contain"/>'
+      : '<div style="width:80px;height:80px;background:' + c.cor + ';border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;font-weight:800">' + (c.sigla || '?').slice(0,3) + '</div>';
+
+    return '<div onclick="selecionarCompanhia(\'' + id + '\')" ' +
+      'style="background:#fff;border:2px solid #e0e0e0;border-radius:14px;padding:24px 18px;text-align:center;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:10px" ' +
+      'onmouseover="this.style.borderColor=\'' + c.cor + '\';this.style.boxShadow=\'0 8px 24px rgba(0,0,0,.15)\';this.style.transform=\'translateY(-2px)\'" ' +
+      'onmouseout="this.style.borderColor=\'#e0e0e0\';this.style.boxShadow=\'none\';this.style.transform=\'translateY(0)\'">' +
+      '<div>' + logoHtml + '</div>' +
+      '<div style="font-size:15px;font-weight:700;color:' + c.cor + '">' + c.nome + '</div>' +
+      '<div style="font-size:11px;color:#666">' + (c.sublinha || '') + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// Abre o seletor (vindo de dentro do app)
+function abrirSeletorCompanhia() {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('cias-select').style.display = 'flex';
+  renderSeletorCompanhia();
+}
+
+// Escolha de companhia → entra no app
+function selecionarCompanhia(id) {
+  if (!_COMPANHIAS_PADRAO[id]) {
+    alert('Companhia inválida: ' + id);
+    return;
+  }
+  // Salva
+  if (typeof APP !== 'undefined') APP.companhiaId = id;
+  _salvarCompanhiaAtual(id);
+
+  // Limpa cache (vai carregar dados da nova companhia)
+  if (typeof DB !== 'undefined' && typeof DB.clearCache === 'function') DB.clearCache();
+
+  // Esconde seletor, entra no app
+  document.getElementById('cias-select').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  // Recarrega
+  atualizarUICompanhia();
+  if (typeof initApp === 'function') initApp();
+}
+
+// Logout via botão do seletor (caso usuário queira sair)
+function sairDoSeletor() {
+  if (typeof logout === 'function') {
+    logout();
+    document.getElementById('cias-select').style.display = 'none';
+  }
+}
+
+// Atualiza o header da sidebar com a companhia atual + mostra/esconde o
+// botão "trocar" baseado em quantas companhias o usuário tem acesso.
+function atualizarUICompanhia() {
+  var c = getCompanhiaAtual();
+  if (!c) return;
+  var nome = document.getElementById('sb-cia-nome');
+  var sub  = document.getElementById('sb-cia-sub');
+  var btn  = document.getElementById('sb-trocar-cia');
+  if (nome) nome.textContent = c.nome || c.sigla || '—';
+  if (sub)  sub.textContent  = c.sublinha || '';
+  if (btn) {
+    var acessiveis = getCompanhiasDoUsuario();
+    btn.style.display = acessiveis.length > 1 ? '' : 'none';
+  }
+
+  // Atualiza title da aba do navegador
+  if (c.nome) document.title = c.nome + ' — Sistema ISEO';
 }

@@ -97,11 +97,29 @@ function _showErr(el, msg) {
 }
 
 function _entrarNoApp() {
-  document.getElementById('ls').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
-  document.getElementById('tbu').textContent = CU.u + ' (' + CU.r + ')';
+  // Reset visual do login (caso volte por logout)
   document.querySelector('.lbt').textContent = 'Entrar';
   document.querySelector('.lbt').disabled = false;
+  document.getElementById('ls').style.display = 'none';
+  document.getElementById('tbu').textContent = CU.u + ' (' + CU.r + ')';
+
+  // Multi-tenant: se o usuário tem acesso a 2+ companhias, mostra o seletor.
+  // Se só 1, entra direto. Se já tem uma salva no localStorage, usa ela.
+  var acessiveis = (typeof getCompanhiasDoUsuario === 'function') ? getCompanhiasDoUsuario() : [];
+  var salva = null;
+  try { salva = localStorage.getItem('iseo_companhia_atual'); } catch (e) {}
+
+  if (acessiveis.length > 1 && (!salva || acessiveis.indexOf(salva) === -1)) {
+    // Mostra seletor
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('cias-select').style.display = 'flex';
+    if (typeof renderSeletorCompanhia === 'function') renderSeletorCompanhia();
+    return;
+  }
+
+  // Entra direto no app
+  document.getElementById('cias-select').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
   initApp();
 }
 
@@ -130,8 +148,12 @@ function logout() {
   FBAUTH.signOut().then(function() {
     CU = null;
     DB.clearCache();
+    // Multi-tenant: limpa companhia salva para o próximo login mostrar o seletor
+    try { localStorage.removeItem('iseo_companhia_atual'); } catch (e) {}
     document.getElementById('ls').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
+    var sel = document.getElementById('cias-select');
+    if (sel) sel.style.display = 'none';
     document.getElementById('lp').value = '';
     document.getElementById('le').style.display = 'none';
   });
