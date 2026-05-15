@@ -37,7 +37,7 @@ var _COMPANHIAS_PADRAO = {
     id: 'forcatatica',
     nome: 'Força Tática / 8º BPM',
     sigla: 'FT',
-    sublinha: '8º BPM · Colatina / Baixo Guandu / Pancas',
+    sublinha: '8º BPM · Colatina',
     municipioPadrao: 'Colatina / ES',
     logoVar: 'LOGO_FT_B64',
     cor: '#c62828',
