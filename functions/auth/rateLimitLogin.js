@@ -6,7 +6,7 @@ const MAX_ATTEMPTS = 5;
 const WINDOW_MS    = 15 * 60 * 1000; // 15 minutos
 
 // Verificar e registrar tentativas de login (chamado antes do signIn)
-exports.checkLoginAttempts = functions.https.onCall(async (data, _context) => {
+exports.checkLoginAttempts = functions.runWith({ invoker: 'public' }).https.onCall(async (data, _context) => {
   const { email } = data;
   if (!email) throw new functions.https.HttpsError('invalid-argument', 'Email não informado.');
 
@@ -31,7 +31,7 @@ exports.checkLoginAttempts = functions.https.onCall(async (data, _context) => {
 });
 
 // Limpar tentativas após login bem-sucedido
-exports.clearLoginAttempts = functions.https.onCall(async (data, context) => {
+exports.clearLoginAttempts = functions.runWith({ invoker: 'public' }).https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Não autenticado.');
   const { email } = data;
   const key = 'login_' + email.replace(/[^a-z0-9]/gi, '_');

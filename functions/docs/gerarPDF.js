@@ -5,7 +5,7 @@ const admin     = require('firebase-admin');
 // Geração de PDF server-side (stub — implementação completa na Fase 3.3)
 // O frontend chama esta função com o ID da escala e recebe uma URL de download.
 // A lógica de geração (hoje em escala.js) será migrada aqui gradualmente.
-exports.gerarPDF = functions.https.onCall(async (data, context) => {
+exports.gerarPDF = functions.runWith({ invoker: 'public' }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Login necessário.');
   }

@@ -33,7 +33,7 @@ async function _removerUserDaLista(db, u) {
 // ─── createUser ───────────────────────────────────────────────────
 // Cria usuário no Firebase Auth, seta Custom Claims (role + companhias)
 // e adiciona na lista /sistema/usuarios. Somente admin pode chamar.
-exports.createUser = functions.https.onCall(async (data, context) => {
+exports.createUser = functions.runWith({ invoker: 'public' }).https.onCall(async (data, context) => {
   if (!context.auth || context.auth.token.role !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'Somente admin pode criar usuários.');
   }
@@ -101,7 +101,7 @@ exports.createUser = functions.https.onCall(async (data, context) => {
 // ─── updateUser ───────────────────────────────────────────────────
 // Atualiza role e/ou companhias de um usuário existente.
 // Mantém Custom Claims e a lista /sistema/usuarios em sincronia.
-exports.updateUser = functions.https.onCall(async (data, context) => {
+exports.updateUser = functions.runWith({ invoker: 'public' }).https.onCall(async (data, context) => {
   if (!context.auth || context.auth.token.role !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'Somente admin pode editar usuários.');
   }
@@ -145,7 +145,7 @@ exports.updateUser = functions.https.onCall(async (data, context) => {
 });
 
 // ─── deleteUser ───────────────────────────────────────────────────
-exports.deleteUser = functions.https.onCall(async (data, context) => {
+exports.deleteUser = functions.runWith({ invoker: 'public' }).https.onCall(async (data, context) => {
   if (!context.auth || context.auth.token.role !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'Somente admin pode remover usuários.');
   }

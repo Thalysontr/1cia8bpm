@@ -3,7 +3,7 @@ const functions = require('firebase-functions/v1');
 const admin     = require('firebase-admin');
 
 // Geração de DOCX server-side (stub — implementação completa na Fase 3.3)
-exports.gerarDocx = functions.https.onCall(async (data, context) => {
+exports.gerarDocx = functions.runWith({ invoker: 'public' }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Login necessário.');
   }
