@@ -132,6 +132,13 @@
         </svg>
         <span class="ni-label">Escalas</span>
       </div>
+      <div class="ni" onclick="nav('analise',this)" title="Análise Estratégica">
+        <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 3v18h18"/>
+          <path d="M7 17l4-4 4 4 6-6"/>
+        </svg>
+        <span class="ni-label">Análise</span>
+      </div>
       <div class="ni" onclick="nav('relatorios',this)" title="Relatórios">
         <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 3h18v18H3z"/>
@@ -510,6 +517,47 @@
       <!-- DISPENSAS -->
       <div id="pdisp" class="panel"></div>
 
+      <!-- ANÁLISE ESTRATÉGICA -->
+      <div id="pana" class="panel">
+        <div class="ph">
+          <div class="pt">📊 Análise Estratégica</div>
+          <div class="ps">Visão de alto nível para planejamento e tomada de decisão</div>
+        </div>
+
+        <!-- Seletor de período -->
+        <div class="card">
+          <div class="ch" style="flex-wrap:wrap;gap:10px">
+            <span class="ct">Período de análise</span>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;margin-left:auto" id="ana-periodos">
+              <button class="btn bsm" data-periodo="mes">Mês atual</button>
+              <button class="btn bsm" data-periodo="mes-ant">Mês anterior</button>
+              <button class="btn bsm" data-periodo="trim">Últimos 3 meses</button>
+              <button class="btn bsm" data-periodo="ano">Ano atual</button>
+              <button class="btn bsm" data-periodo="12m">Últimos 12 meses</button>
+            </div>
+          </div>
+          <div id="ana-periodo-label" style="font-size:11px;color:var(--t2);margin-top:6px"></div>
+        </div>
+
+        <!-- KPIs no topo -->
+        <div id="ana-kpis"></div>
+
+        <!-- Alertas críticos -->
+        <div id="ana-alertas"></div>
+
+        <!-- Distribuição de carga (ranking militares) -->
+        <div id="ana-ranking"></div>
+
+        <!-- Heatmap calendar -->
+        <div id="ana-heatmap"></div>
+
+        <!-- Análise por operação -->
+        <div id="ana-operacoes"></div>
+
+        <!-- Projeção de saldo -->
+        <div id="ana-projecao"></div>
+      </div>
+
       <!-- RELATÓRIOS -->
       <div id="prel" class="panel">
         <div class="ph">
@@ -642,6 +690,7 @@ var TMPL_B64="UEsDBBQAAAAIAIFdlVzJf3/HuAEAABMJAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbL
 <script src="js/vrte_painel_patch.js"></script>
 <script src="js/vrte_calendario.js"></script>
 <script src="js/vrte_reatribuir.js"></script>
+<script src="js/analise.js"></script>
 
 </body>
 </html>

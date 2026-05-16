@@ -18,6 +18,7 @@ var _PERMISSOES = {
   admin: {
     ver_painel: true,
     ver_relatorios: true,
+    ver_analise: true,
     criar_escala: true,
     editar_escala: true,
     cancelar_escala: true,
@@ -43,6 +44,7 @@ var _PERMISSOES = {
   comandante: {
     ver_painel: true,
     ver_relatorios: true,
+    ver_analise: true,
     criar_escala: true,
     editar_escala: true,
     cancelar_escala: true,
@@ -68,6 +70,7 @@ var _PERMISSOES = {
   operador: {
     ver_painel: true,
     ver_relatorios: true,
+    ver_analise: false,
     criar_escala: true,
     editar_escala: true,        // pode editar (incluindo dos outros — simplifica)
     cancelar_escala: false,
@@ -93,6 +96,7 @@ var _PERMISSOES = {
   visualizador: {
     ver_painel: true,
     ver_relatorios: true,
+    ver_analise: false,
     criar_escala: false,
     editar_escala: false,
     cancelar_escala: false,

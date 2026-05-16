@@ -16,7 +16,7 @@ var APP = {
 };
 
 // ─── Navegação ──────────────────────────────────────────────────
-var PNL = { painel:'pp', vrte:'pv', ops:'po', nova:'pn', escalas:'pe', mils:'pm', cfg:'pc', disp:'pdisp', relatorios:'prel' };
+var PNL = { painel:'pp', vrte:'pv', ops:'po', nova:'pn', escalas:'pe', mils:'pm', cfg:'pc', disp:'pdisp', relatorios:'prel', analise:'pana' };
 
 function nav(id, el) {
   document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('on'); });
@@ -36,6 +36,7 @@ function render(id) {
   if (id === 'cfg')         rCfg();
   if (id === 'disp')        rDisp();
   if (id === 'relatorios' && typeof rRelatorios === 'function') rRelatorios();
+  if (id === 'analise'    && typeof rAnalise    === 'function') rAnalise();
 }
 
 // ─── Inicialização — carrega tudo do Firestore antes de renderizar
@@ -88,6 +89,7 @@ function aplicarPermissoesUI() {
   }
   _hideNav('nova',       can('criar_escala'));
   _hideNav('cfg',        can('gerenciar_usuarios'));
+  _hideNav('analise',    can('ver_analise'));
   _hideNav('ops',        can('cadastrar_operacao') || can('ver_painel')); // Operações: todos veem
 
   // Form de cadastrar militar — esconde para quem não pode cadastrar
