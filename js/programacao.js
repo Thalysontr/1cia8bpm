@@ -16,6 +16,34 @@ window._PROG_STATE = {
   offsetSemanas: 0
 };
 
+// VRTE por hora (mesma tabela de db.js / relatorio.js)
+var _PROG_VRTE_HORA = { 6: 80, 8: 100, 12: 120 };
+
+// Estado do simulador (persiste em localStorage)
+var _PROG_SIM_KEY = 'iseo_prog_sim_v1';
+
+function _progSimCarregar() {
+  try {
+    var raw = localStorage.getItem(_PROG_SIM_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  // Default: linhas baseadas nas operações cadastradas
+  var linhas = [];
+  (APP.ops || []).slice(0, 3).forEach(function(op) {
+    linhas.push({ op: op.nome || '', qtd: 0, mils: 4, horas: 8 });
+  });
+  if (!linhas.length) {
+    linhas.push({ op: '', qtd: 0, mils: 4, horas: 8 });
+  }
+  return linhas;
+}
+
+function _progSimSalvar(linhas) {
+  try { localStorage.setItem(_PROG_SIM_KEY, JSON.stringify(linhas)); } catch (e) {}
+}
+
+window._PROG_SIM = _progSimCarregar();
+
 function rProgramacao() {
   _progRenderTudo();
 }
@@ -39,6 +67,7 @@ function _progRenderTudo() {
     lbl.textContent = _progFmtDataCurta(ini) + ' a ' + _progFmtDataCurta(fim);
   }
   _progRenderCapacidade(sem);
+  _progRenderSimulador();
   _progRenderSemana(sem);
   _progRenderSugestoes(sem);
 }
@@ -345,3 +374,194 @@ function _progRenderSugestoes(sem) {
   html += '</div>';
   box.innerHTML = html;
 }
+
+// ═══════════════════════════════════════════════════════════════
+// SIMULADOR DE PLANEJAMENTO MENSAL
+// ═══════════════════════════════════════════════════════════════
+//
+// Permite o comando estimar antes de criar: "se eu fizer N escalas
+// de Y militares por dia em Z horas, vou gastar K VRTE — sobra L".
+//
+// Linhas dinâmicas: cada operação cadastrada vira uma linha,
+// usuário ajusta quantidade/militares/horas. Total calculado ao vivo.
+// Estado persiste em localStorage.
+// ═══════════════════════════════════════════════════════════════
+function _progRenderSimulador() {
+  var box = document.getElementById('prog-simulador');
+  if (!box) return;
+
+  var sim = window._PROG_SIM || [];
+  var saldo = (APP.vrte && APP.vrte.saldo) || 0;
+
+  // Calcula totais
+  var totalEscalas = 0, totalVRTE = 0, totalMilEsc = 0;
+  sim.forEach(function(linha) {
+    var qtd = parseInt(linha.qtd, 10) || 0;
+    var mils = parseInt(linha.mils, 10) || 0;
+    var horas = parseInt(linha.horas, 10) || 8;
+    var vrtePorEsc = mils * (_PROG_VRTE_HORA[horas] || 100);
+    var vrteLinha = qtd * vrtePorEsc;
+    totalEscalas += qtd;
+    totalVRTE += vrteLinha;
+    totalMilEsc += qtd * mils;
+  });
+
+  var saldoApos = saldo - totalVRTE;
+  var corSaldoApos = saldoApos <= 0 ? '#c62828' : saldoApos < 1000 ? '#e65100' : '#2e7d32';
+  var pctUso = saldo > 0 ? Math.min(100, Math.round((totalVRTE / saldo) * 100)) : 0;
+  var corPct = pctUso >= 100 ? '#c62828' : pctUso >= 80 ? '#e65100' : pctUso >= 50 ? '#1565c0' : '#2e7d32';
+
+  // Opções para dropdown de operação
+  var ops = (APP.ops || []).map(function(o) { return o.nome || ''; }).filter(Boolean);
+
+  var html = '<div class="card"><div class="ch" style="flex-wrap:wrap;gap:8px">' +
+    '<span class="ct">🧮 Simulador de planejamento</span>' +
+    '<span style="font-size:11px;color:var(--t2);font-style:italic">' +
+      'Estime quanto VRTE vai gastar antes de criar as escalas' +
+    '</span>' +
+    '<button class="btn bsm" onclick="_progSimAddLinha()" style="margin-left:auto">+ Adicionar linha</button>' +
+    '<button class="btn bsm" onclick="_progSimResetar()" style="background:#ffebee;color:#c62828">↺ Limpar tudo</button>' +
+  '</div>';
+
+  // Tabela de simulação
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:6px">' +
+    '<thead><tr style="background:var(--s2)">' +
+      '<th style="text-align:left;padding:8px 6px;border-bottom:1px solid var(--b);min-width:160px">Operação</th>' +
+      '<th style="text-align:center;padding:8px 6px;border-bottom:1px solid var(--b);width:90px">Escalas</th>' +
+      '<th style="text-align:center;padding:8px 6px;border-bottom:1px solid var(--b);width:90px">Mils/Esc</th>' +
+      '<th style="text-align:center;padding:8px 6px;border-bottom:1px solid var(--b);width:90px">Duração</th>' +
+      '<th style="text-align:center;padding:8px 6px;border-bottom:1px solid var(--b);width:80px">VRTE/Esc</th>' +
+      '<th style="text-align:center;padding:8px 6px;border-bottom:1px solid var(--b);width:110px">VRTE Total</th>' +
+      '<th style="width:40px"></th>' +
+    '</tr></thead><tbody>';
+
+  sim.forEach(function(linha, idx) {
+    var mils = parseInt(linha.mils, 10) || 0;
+    var horas = parseInt(linha.horas, 10) || 8;
+    var qtd = parseInt(linha.qtd, 10) || 0;
+    var vrtePorEsc = mils * (_PROG_VRTE_HORA[horas] || 100);
+    var vrteLinha = qtd * vrtePorEsc;
+
+    // Dropdown de operação (com opções existentes + opção "Outra" digitada)
+    var opsHtml = '<option value="">— selecione —</option>';
+    ops.forEach(function(o) {
+      opsHtml += '<option value="' + esc(o) + '"' + (linha.op === o ? ' selected' : '') + '>' + esc(o) + '</option>';
+    });
+    // Se a op atual não está na lista (ex: "Outra"), adiciona
+    if (linha.op && ops.indexOf(linha.op) === -1) {
+      opsHtml += '<option value="' + esc(linha.op) + '" selected>' + esc(linha.op) + ' (custom)</option>';
+    }
+
+    html += '<tr style="border-bottom:1px solid var(--b)">' +
+      '<td style="padding:4px 6px">' +
+        '<select onchange="_progSimUpd(' + idx + ',\'op\',this.value)" style="width:100%;padding:5px;font-size:12px">' +
+          opsHtml +
+        '</select>' +
+      '</td>' +
+      '<td style="padding:4px 6px;text-align:center">' +
+        '<input type="number" min="0" value="' + qtd + '" oninput="_progSimUpd(' + idx + ',\'qtd\',this.value)" style="width:70px;text-align:center;padding:5px;font-size:12px"/>' +
+      '</td>' +
+      '<td style="padding:4px 6px;text-align:center">' +
+        '<input type="number" min="1" value="' + mils + '" oninput="_progSimUpd(' + idx + ',\'mils\',this.value)" style="width:70px;text-align:center;padding:5px;font-size:12px"/>' +
+      '</td>' +
+      '<td style="padding:4px 6px;text-align:center">' +
+        '<select onchange="_progSimUpd(' + idx + ',\'horas\',this.value)" style="width:80px;padding:5px;font-size:12px">' +
+          '<option value="6"'  + (horas == 6 ? ' selected' : '')  + '>6 hrs</option>' +
+          '<option value="8"'  + (horas == 8 ? ' selected' : '')  + '>8 hrs</option>' +
+          '<option value="12"' + (horas == 12 ? ' selected' : '') + '>12 hrs</option>' +
+        '</select>' +
+      '</td>' +
+      '<td style="padding:4px 6px;text-align:center;color:var(--t2);font-family:var(--mo,monospace)">' + vrtePorEsc.toLocaleString('pt-BR') + '</td>' +
+      '<td style="padding:4px 6px;text-align:center;font-weight:700;color:#1565c0;font-family:var(--mo,monospace)">' + vrteLinha.toLocaleString('pt-BR') + '</td>' +
+      '<td style="text-align:center">' +
+        '<button class="btn bsm brd" onclick="_progSimDelLinha(' + idx + ')" title="Remover linha" style="padding:3px 8px">×</button>' +
+      '</td>' +
+    '</tr>';
+  });
+
+  // Linha de total
+  html += '<tr style="background:#f5f5f5;font-weight:700">' +
+    '<td style="padding:10px 6px;border-top:2px solid var(--b)">TOTAL</td>' +
+    '<td style="padding:10px 6px;border-top:2px solid var(--b);text-align:center">' + totalEscalas + '</td>' +
+    '<td style="padding:10px 6px;border-top:2px solid var(--b);text-align:center;color:var(--t2);font-weight:400">— mils-esc: ' + totalMilEsc + '</td>' +
+    '<td colspan="2" style="border-top:2px solid var(--b)"></td>' +
+    '<td style="padding:10px 6px;border-top:2px solid var(--b);text-align:center;color:#1565c0;font-size:14px">' + totalVRTE.toLocaleString('pt-BR') + '</td>' +
+    '<td style="border-top:2px solid var(--b)"></td>' +
+  '</tr>';
+
+  html += '</tbody></table></div>';
+
+  // Resumo visual de saldo
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:14px">' +
+
+    '<div style="padding:10px;background:#e3f2fd;border-radius:6px;border-left:4px solid #1565c0">' +
+      '<div style="font-size:9px;font-weight:700;color:var(--t2);text-transform:uppercase">Saldo atual</div>' +
+      '<div style="font-size:22px;font-weight:800;color:#1565c0;line-height:1.1">' + saldo.toLocaleString('pt-BR') + '</div>' +
+      '<div style="font-size:10px;color:var(--t2)">VRTE disponível</div>' +
+    '</div>' +
+
+    '<div style="padding:10px;background:#ede7f6;border-radius:6px;border-left:4px solid #6a1f6e">' +
+      '<div style="font-size:9px;font-weight:700;color:var(--t2);text-transform:uppercase">Simulado gastar</div>' +
+      '<div style="font-size:22px;font-weight:800;color:#6a1f6e;line-height:1.1">' + totalVRTE.toLocaleString('pt-BR') + '</div>' +
+      '<div style="font-size:10px;color:var(--t2)">' + totalEscalas + ' escala(s) planejada(s)</div>' +
+    '</div>' +
+
+    '<div style="padding:10px;background:#f1f8e9;border-radius:6px;border-left:4px solid ' + corSaldoApos + '">' +
+      '<div style="font-size:9px;font-weight:700;color:var(--t2);text-transform:uppercase">Sobra após simulação</div>' +
+      '<div style="font-size:22px;font-weight:800;color:' + corSaldoApos + ';line-height:1.1">' + saldoApos.toLocaleString('pt-BR') + '</div>' +
+      '<div style="font-size:10px;color:var(--t2)">' + (saldoApos < 0 ? '⚠ Estouro de orçamento!' : 'VRTE restante') + '</div>' +
+    '</div>' +
+
+    '<div style="padding:10px;background:#fff3e0;border-radius:6px;border-left:4px solid ' + corPct + '">' +
+      '<div style="font-size:9px;font-weight:700;color:var(--t2);text-transform:uppercase">Uso do saldo</div>' +
+      '<div style="font-size:22px;font-weight:800;color:' + corPct + ';line-height:1.1">' + pctUso + '%</div>' +
+      '<div style="height:5px;background:#fff;border-radius:3px;margin-top:4px;border:1px solid #eee;overflow:hidden">' +
+        '<div style="height:100%;width:' + Math.min(100, pctUso) + '%;background:' + corPct + '"></div>' +
+      '</div>' +
+    '</div>' +
+
+  '</div>';
+
+  // Aviso se estourou
+  if (saldoApos < 0) {
+    html += '<div style="margin-top:10px;padding:10px;background:#ffebee;border-left:4px solid #c62828;border-radius:4px;font-size:12px;color:#c62828;font-weight:600">' +
+      '⚠ Atenção: você precisa de ' + Math.abs(saldoApos).toLocaleString('pt-BR') + ' VRTE a mais do que tem em saldo. ' +
+      'Reduza alguma operação ou registre nova entrada de VRTE antes de programar.' +
+    '</div>';
+  }
+
+  box.innerHTML = html;
+}
+
+// Atualiza um campo de uma linha do simulador
+window._progSimUpd = function(idx, campo, valor) {
+  if (!window._PROG_SIM[idx]) return;
+  window._PROG_SIM[idx][campo] = valor;
+  _progSimSalvar(window._PROG_SIM);
+  _progRenderSimulador();
+};
+
+// Adiciona nova linha
+window._progSimAddLinha = function() {
+  if (!window._PROG_SIM) window._PROG_SIM = [];
+  window._PROG_SIM.push({ op: '', qtd: 0, mils: 4, horas: 8 });
+  _progSimSalvar(window._PROG_SIM);
+  _progRenderSimulador();
+};
+
+// Remove uma linha
+window._progSimDelLinha = function(idx) {
+  if (!window._PROG_SIM[idx]) return;
+  window._PROG_SIM.splice(idx, 1);
+  if (!window._PROG_SIM.length) window._PROG_SIM.push({ op: '', qtd: 0, mils: 4, horas: 8 });
+  _progSimSalvar(window._PROG_SIM);
+  _progRenderSimulador();
+};
+
+// Reseta o simulador
+window._progSimResetar = function() {
+  if (!confirm('Limpar todas as linhas da simulação?')) return;
+  try { localStorage.removeItem(_PROG_SIM_KEY); } catch(e) {}
+  window._PROG_SIM = _progSimCarregar();
+  _progRenderSimulador();
+};
