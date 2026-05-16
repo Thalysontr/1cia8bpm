@@ -62,6 +62,14 @@ service cloud.firestore {
         allow delete: if canManage() && canAccessCia(cid);
       }
 
+      // Escalas Extra (GSE — Guarda de Serviço Extra)
+      match /escalas_extra/{docId} {
+        allow read:   if isUser() && canAccessCia(cid);
+        allow create: if canEdit() && canAccessCia(cid);
+        allow update: if canEdit() && canAccessCia(cid);
+        allow delete: if canManage() && canAccessCia(cid);
+      }
+
       // Dispensas: criar/editar/excluir qualquer não-visualizador
       match /dispensas/{docId} {
         allow read:  if isUser() && canAccessCia(cid);

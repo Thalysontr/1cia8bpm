@@ -15,6 +15,7 @@ var _CACHE = {
   mils:       null,
   ops:        null,
   escs:       null,
+  escsExtra:  null,
   vrte:       null,
   users:      null,
   assinantes: null,
@@ -166,6 +167,38 @@ var DB = {
   deleteEsc: function(id, cb) {
     _colC('escalas').doc(String(id)).delete().then(function() {
       _CACHE.escs = null;
+      if (cb) cb();
+    });
+  },
+
+  // ── ESCALAS EXTRA (GSE — Guarda de Serviço Extra) ────────────
+  getEscsExtra: function(cb) {
+    if (_CACHE.escsExtra) { cb(_CACHE.escsExtra); return; }
+    _colC('escalas_extra').orderBy('data','desc').get().then(function(snap) {
+      var list = [];
+      snap.forEach(function(d) { list.push(d.data()); });
+      _CACHE.escsExtra = list;
+      cb(list);
+    }).catch(function(e) {
+      console.warn('[DB.getEscsExtra] erro:', e);
+      _CACHE.escsExtra = [];
+      cb([]);
+    });
+  },
+
+  saveEscExtra: function(esc, cb) {
+    _colC('escalas_extra').doc(String(esc.id)).set(_stripUndefined(esc)).then(function() {
+      _CACHE.escsExtra = null;
+      if (cb) cb();
+    }).catch(function(e) {
+      console.error('[DB.saveEscExtra] erro:', e);
+      if (cb) cb(e);
+    });
+  },
+
+  deleteEscExtra: function(id, cb) {
+    _colC('escalas_extra').doc(String(id)).delete().then(function() {
+      _CACHE.escsExtra = null;
       if (cb) cb();
     });
   },

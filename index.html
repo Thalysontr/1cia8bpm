@@ -122,6 +122,12 @@
         </svg>
         <span class="ni-label">Nova Escala</span>
       </div>
+      <div class="ni" onclick="nav('extra',this)" title="Escala Extra (GSE)">
+        <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/>
+        </svg>
+        <span class="ni-label">Escala Extra</span>
+      </div>
       <div class="ni" onclick="nav('prog',this)" title="Programação de Escalas">
         <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="2"/>
@@ -419,6 +425,59 @@
           <button class="btn bp" onclick="salvarEsc()">Salvar escala</button>
         </div>
         <div id="parea"></div>
+      </div>
+
+      <!-- ESCALA EXTRA (GSE) -->
+      <div id="pextra" class="panel">
+        <div class="ph">
+          <div class="pt">⚡ Escala Extra (GSE)</div>
+          <div class="ps">Guarda de Serviço Extra — cadastro e gestão</div>
+        </div>
+
+        <!-- Card de cadastro/edição -->
+        <div class="card">
+          <div class="ch" style="flex-wrap:wrap;gap:8px">
+            <span class="ct" id="extra-form-titulo">Nova escala extra</span>
+            <button class="btn bsm" id="extra-btn-cancelar" onclick="cancelarEdicaoExtra()" style="display:none;margin-left:auto">× Cancelar edição</button>
+          </div>
+
+          <div class="fr">
+            <div class="fg">
+              <label>Data da escala extra <span style="color:var(--rd)">*</span></label>
+              <input type="date" id="extra-data"/>
+            </div>
+            <div class="fg">
+              <label>Assinante</label>
+              <select id="extra-assinante"></select>
+            </div>
+          </div>
+
+          <div id="extra-secoes"></div>
+
+          <div style="margin-top:10px">
+            <button class="btn" onclick="addSecaoExtra()">+ Adicionar seção (horário/local)</button>
+          </div>
+
+          <div class="alert aok" id="extra-alert-ok">✓ Escala extra salva!</div>
+          <div class="alert aer" id="extra-alert-erro" style="display:none"></div>
+
+          <div class="ar2"><button class="btn bp" onclick="salvarEscExtra()">Salvar escala extra</button></div>
+        </div>
+
+        <!-- Card de listagem -->
+        <div class="card">
+          <div class="ch" style="flex-wrap:wrap;gap:8px">
+            <span class="ct">Escalas Extras Geradas</span>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--t2);cursor:pointer;user-select:none;margin-left:auto">
+              <input type="checkbox" id="extra-mostrar-canceladas" onchange="rExtra()" style="cursor:pointer"/>
+              Mostrar canceladas
+            </label>
+          </div>
+          <div class="tw"><table>
+            <thead><tr><th>Data</th><th>Seções</th><th>Militares</th><th>Ações</th></tr></thead>
+            <tbody id="extra-tabela"></tbody>
+          </table></div>
+        </div>
       </div>
 
       <!-- PROGRAMAÇÃO DE ESCALAS -->
@@ -733,6 +792,7 @@ var TMPL_B64="UEsDBBQAAAAIAIFdlVzJf3/HuAEAABMJAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbL
 <script src="js/vrte_reatribuir.js"></script>
 <script src="js/analise.js"></script>
 <script src="js/programacao.js"></script>
+<script src="js/escala_extra.js"></script>
 
 </body>
 </html>

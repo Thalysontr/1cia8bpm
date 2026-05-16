@@ -8,6 +8,7 @@ var APP = {
   mils:       [],
   ops:        [],
   escs:       [],
+  escsExtra:  [],
   vrte:       { saldo: 0, hist: [] },
   users:      [],
   assinantes: [],
@@ -16,7 +17,7 @@ var APP = {
 };
 
 // ─── Navegação ──────────────────────────────────────────────────
-var PNL = { painel:'pp', vrte:'pv', ops:'po', nova:'pn', prog:'pprog', escalas:'pe', mils:'pm', cfg:'pc', disp:'pdisp', relatorios:'prel', analise:'pana' };
+var PNL = { painel:'pp', vrte:'pv', ops:'po', nova:'pn', extra:'pextra', prog:'pprog', escalas:'pe', mils:'pm', cfg:'pc', disp:'pdisp', relatorios:'prel', analise:'pana' };
 
 function nav(id, el) {
   document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('on'); });
@@ -38,6 +39,7 @@ function render(id) {
   if (id === 'relatorios' && typeof rRelatorios === 'function') rRelatorios();
   if (id === 'analise'    && typeof rAnalise    === 'function') rAnalise();
   if (id === 'prog'       && typeof rProgramacao === 'function') rProgramacao();
+  if (id === 'extra'      && typeof rExtra      === 'function') rExtra();
 }
 
 // ─── Inicialização — carrega tudo do Firestore antes de renderizar
@@ -55,7 +57,7 @@ function initApp() {
   document.getElementById('dm').innerHTML = '<div style="color:var(--t3);font-size:12px;padding:20px">Carregando dados...</div>';
 
   // Carregar tudo em paralelo
-  var pendentes = 6;
+  var pendentes = 7;
   function check() {
     pendentes--;
     if (pendentes === 0) _appPronto();
@@ -64,6 +66,7 @@ function initApp() {
   DB.getMils(function(list)       { APP.mils       = list; check(); });
   DB.getOps(function(list)        { APP.ops        = list; check(); });
   DB.getEscs(function(list)       { APP.escs       = list; check(); });
+  DB.getEscsExtra(function(list)  { APP.escsExtra  = list; check(); });
   DB.getVrte(function(v)          { APP.vrte       = v;    check(); });
   DB.getAssinantes(function(list) { APP.assinantes = list; check(); });
   DB.getDisps(function(list)      { APP.disps      = list; check(); });
@@ -92,6 +95,7 @@ function aplicarPermissoesUI() {
   _hideNav('cfg',        can('gerenciar_usuarios'));
   _hideNav('analise',    can('ver_analise'));
   _hideNav('prog',       can('ver_programacao'));
+  _hideNav('extra',      true); // todos veem (visualizador só lê; permissões em cada botão)
   _hideNav('ops',        can('cadastrar_operacao') || can('ver_painel')); // Operações: todos veem
 
   // Form de cadastrar militar — esconde para quem não pode cadastrar
@@ -137,6 +141,7 @@ function aplicarPermissoesUI() {
 function reloadMils(cb)  { DB.clearCache('mils');  DB.getMils(function(l){ APP.mils=l; if(cb)cb(l); }); }
 function reloadOps(cb)   { DB.clearCache('ops');   DB.getOps(function(l){ APP.ops=l; if(cb)cb(l); }); }
 function reloadEscs(cb)  { DB.clearCache('escs');  DB.getEscs(function(l){ APP.escs=l; if(cb)cb(l); }); }
+function reloadEscsExtra(cb) { DB.clearCache('escsExtra'); DB.getEscsExtra(function(l){ APP.escsExtra=l; if(cb)cb(l); }); }
 function reloadVrte(cb)  { DB.clearCache('vrte');  DB.getVrte(function(v){ APP.vrte=v; if(cb)cb(v); }); }
 function reloadUsers(cb) { DB.clearCache('users'); DB.getUsers(function(l){ APP.users=l; if(cb)cb(l); }); }
 function reloadDisp(cb) { DB.clearCache('disps'); DB.getDisps(function(l){ APP.disps=l; if(cb)cb(l); }); }

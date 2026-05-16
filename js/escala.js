@@ -985,6 +985,21 @@ function salvarEsc() {
     return;
   }
 
+  // ⭐ VALIDAÇÃO CROSS-CHECK: militar não pode estar em ISEO + Extra mesmo dia
+  if (typeof detectarConflitoMilitares === 'function') {
+    var todosMilsEscala = [];
+    (d.turnos || []).forEach(function(t) {
+      (t.mils || []).forEach(function(m) { todosMilsEscala.push(m); });
+    });
+    var conflitos = detectarConflitoMilitares(d.data, todosMilsEscala, {
+      iseo: isEditando ? [_editandoEscalaId] : []
+    });
+    if (conflitos.length) {
+      alert(formatarMsgConflito(conflitos));
+      return;
+    }
+  }
+
   // Verifica se DB existe
   if (typeof DB === 'undefined' || typeof DB.saveEsc !== 'function') {
     console.error('[salvarEsc] DB.saveEsc não disponível');
