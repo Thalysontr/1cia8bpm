@@ -200,11 +200,31 @@ window.buscarMilExtra = function(idxSec, q) {
     return;
   }
 
+  // Data da escala atual (pra mostrar contadores do mês)
+  var dataEsc = (document.getElementById('extra-data') || {}).value || '';
+  var st2 = window._EXTRA_STATE;
+  var excluirExtra = st2.editandoId ? [st2.editandoId] : [];
+
   box.innerHTML = mils.map(function(m) {
     var ng = m.nomeGuerra ? '<strong>' + esc(m.nomeGuerra) + '</strong> · ' : '';
+    // Contadores do mês (pra alertar antes de adicionar)
+    var infoStatus = '';
+    if (dataEsc) {
+      var jaIseo  = (typeof contarEscalasMilitarNoMes === 'function') ? contarEscalasMilitarNoMes(m.rg, dataEsc, 'iseo', []) : 0;
+      var jaExtra = (typeof contarEscalasMilitarNoMes === 'function') ? contarEscalasMilitarNoMes(m.rg, dataEsc, 'extra', excluirExtra) : 0;
+      var limIseo  = window._LIMITE_ISEO_MES || 4;
+      var limExtra = window._LIMITE_GSE_MES  || 1;
+      var corExtra = jaExtra >= limExtra ? '#c62828' : '#2e7d32';
+      var corIseo  = jaIseo  >= limIseo  ? '#c62828' : jaIseo >= limIseo-1 ? '#e65100' : '#2e7d32';
+      infoStatus = '<div style="margin-top:3px;font-size:10px;display:flex;gap:8px">' +
+        '<span style="color:' + corExtra + '">Extra mês: ' + jaExtra + '/' + limExtra + (jaExtra >= limExtra ? ' ⛔' : '') + '</span>' +
+        '<span style="color:' + corIseo  + '">ISEO mês: '  + jaIseo  + '/' + limIseo  + (jaIseo  >= limIseo  ? ' ⛔' : '') + '</span>' +
+      '</div>';
+    }
     return '<div onclick="adicionarMilExtra(' + idxSec + ',\'' + (m.rg || '').replace(/\'/g,"\\'") + '\')" style="padding:6px 10px;background:#fff;border:1px solid var(--b);border-radius:4px;margin-bottom:3px;cursor:pointer;font-size:12px">' +
       '<strong>' + esc(m.posto || '') + '</strong> — ' + ng + esc(m.nome || '') +
       ' <span style="color:var(--t3);font-size:10px">RG ' + esc(m.rg || '') + '</span>' +
+      infoStatus +
     '</div>';
   }).join('');
 };
@@ -300,6 +320,122 @@ window.detectarConflitoMilitares = detectarConflitoMilitares;
 window.formatarMsgConflito = formatarMsgConflito;
 
 // ═══════════════════════════════════════════════════════════════
+// LIMITES MENSAIS POR MILITAR
+// ═══════════════════════════════════════════════════════════════
+//
+// Regras de negócio:
+//   - ISEO: máximo 4 escalas por militar por mês
+//   - GSE (Extra): máximo 1 escala por militar por mês
+//
+// Constantes (alterar aqui se mudar a política):
+window._LIMITE_ISEO_MES = 4;
+window._LIMITE_GSE_MES  = 1;
+
+// Conta quantas escalas do tipo um militar já tem no mês da data informada.
+// tipo: 'iseo' | 'extra'
+// excluirIds: ids de escalas a NÃO contar (caso edição)
+function contarEscalasMilitarNoMes(rg, dataReferencia, tipo, excluirIds) {
+  if (!rg || !dataReferencia) return 0;
+  var d = new Date(dataReferencia + 'T12:00:00');
+  if (isNaN(d.getTime())) return 0;
+  var mes = d.getMonth();
+  var ano = d.getFullYear();
+  excluirIds = excluirIds || [];
+
+  var count = 0;
+
+  if (tipo === 'iseo') {
+    (APP.escs || []).forEach(function(e) {
+      if (!e || e.cancelada === true || e.status === 'cancelada') return;
+      if (!e.data) return;
+      if (excluirIds.indexOf(e.id) !== -1) return;
+      var ed = new Date(e.data + 'T12:00:00');
+      if (ed.getMonth() !== mes || ed.getFullYear() !== ano) return;
+      var tem = (e.militares || []).some(function(m) { return m.rg === rg; });
+      if (tem) count++;
+    });
+  } else if (tipo === 'extra') {
+    (APP.escsExtra || []).forEach(function(e) {
+      if (!e || e.cancelada === true) return;
+      if (!e.data) return;
+      if (excluirIds.indexOf(e.id) !== -1) return;
+      var ed = new Date(e.data + 'T12:00:00');
+      if (ed.getMonth() !== mes || ed.getFullYear() !== ano) return;
+      var tem = (e.secoes || []).some(function(s) {
+        return (s.militares || []).some(function(m) { return m.rg === rg; });
+      });
+      if (tem) count++;
+    });
+  }
+
+  return count;
+}
+
+// Valida o limite mensal para cada militar.
+// Retorna lista de bloqueios (militares que JÁ atingiram o limite).
+function validarLimitesMensais(data, militares, tipoEscala, excluirIds) {
+  var limite = tipoEscala === 'extra' ? window._LIMITE_GSE_MES : window._LIMITE_ISEO_MES;
+  var nomeTipo = tipoEscala === 'extra' ? 'Extra (GSE)' : 'ISEO';
+  var bloqueios = [];
+  var contadosPorRg = {};
+
+  // Conta quantas vezes o mesmo militar aparece NA escala atual (pode ser adicionado em vários turnos)
+  var qtdNoFormPorRg = {};
+  (militares || []).forEach(function(m) {
+    if (!m || !m.rg) return;
+    qtdNoFormPorRg[m.rg] = (qtdNoFormPorRg[m.rg] || 0) + 1;
+  });
+
+  Object.keys(qtdNoFormPorRg).forEach(function(rg) {
+    var jaTemHoje = contarEscalasMilitarNoMes(rg, data, tipoEscala, excluirIds);
+    var qtdAdicionar = qtdNoFormPorRg[rg];
+    var totalSeSalvar = jaTemHoje + qtdAdicionar;
+
+    if (totalSeSalvar > limite) {
+      // Acha o nome
+      var m = (APP.mils || []).find(function(x) { return x.rg === rg; }) || {};
+      var nome = (militares.find(function(x) { return x.rg === rg; }) || {}).nome || m.nome || rg;
+
+      bloqueios.push({
+        rg: rg, nome: nome,
+        jaTem: jaTemHoje, vaiAdicionar: qtdAdicionar, total: totalSeSalvar,
+        limite: limite, tipo: nomeTipo
+      });
+    }
+  });
+
+  return bloqueios;
+}
+
+// Mensagem formatada para alert
+function formatarMsgLimiteMensal(bloqueios, dataReferencia) {
+  var d = new Date(dataReferencia + 'T12:00:00');
+  var nomesMeses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                    'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var mesLabel = nomesMeses[d.getMonth()] + '/' + d.getFullYear();
+
+  var msg = '⚠ LIMITE MENSAL ATINGIDO — ' + mesLabel + '\n\n';
+  msg += 'Os militares abaixo ultrapassariam o limite mensal de escalas ' +
+         'se esta escala for salva:\n\n';
+  bloqueios.slice(0, 10).forEach(function(b) {
+    msg += '• ' + b.nome + ' (RG ' + b.rg + ')\n';
+    msg += '    Já tem: ' + b.jaTem + ' ' + b.tipo + ' no mês\n';
+    msg += '    Esta escala adicionaria: ' + b.vaiAdicionar + '\n';
+    msg += '    Total: ' + b.total + ' / Limite: ' + b.limite + '\n\n';
+  });
+  if (bloqueios.length > 10) {
+    msg += '... e mais ' + (bloqueios.length - 10) + ' militar(es) em situação semelhante.\n\n';
+  }
+  msg += 'Remova esses militares da escala e escolha outros, ou cancele/edite ' +
+         'escalas anteriores deles no mês.';
+  return msg;
+}
+
+window.contarEscalasMilitarNoMes = contarEscalasMilitarNoMes;
+window.validarLimitesMensais = validarLimitesMensais;
+window.formatarMsgLimiteMensal = formatarMsgLimiteMensal;
+
+// ═══════════════════════════════════════════════════════════════
 // SALVAR ESCALA EXTRA (com validação cross-check)
 // ═══════════════════════════════════════════════════════════════
 window.salvarEscExtra = function() {
@@ -328,6 +464,13 @@ window.salvarEscExtra = function() {
   });
   if (conflitos.length) {
     alert(formatarMsgConflito(conflitos));
+    return;
+  }
+
+  // Validação de limite mensal (GSE: máx 1/mês por militar)
+  var bloqueios = validarLimitesMensais(data, todosMils, 'extra', isEdit ? [st.editandoId] : []);
+  if (bloqueios.length) {
+    alert(formatarMsgLimiteMensal(bloqueios, data));
     return;
   }
 

@@ -388,15 +388,35 @@ function _filtrarMilitares(turnoIdx, query) {
     return;
   }
 
+  // Data da escala (para mostrar contadores do mês — limites mensais)
+  var dataEsc = (document.getElementById('ed') || {}).value || '';
+  var excluirIseo = (_editandoEscalaId ? [_editandoEscalaId] : []);
+
   div.style.display = 'block';
   div.innerHTML = filtrados.slice(0, 50).map(function(m) {
     var rg = m.rg || m.nf || '';
     var rgSafe = String(rg).replace(/'/g, "\\'");
+
+    // Contadores mensais (avisa o usuário ANTES de adicionar)
+    var infoStatus = '';
+    if (dataEsc && typeof contarEscalasMilitarNoMes === 'function') {
+      var jaIseo  = contarEscalasMilitarNoMes(m.rg, dataEsc, 'iseo',  excluirIseo);
+      var jaExtra = contarEscalasMilitarNoMes(m.rg, dataEsc, 'extra', []);
+      var limIseo  = window._LIMITE_ISEO_MES || 4;
+      var limExtra = window._LIMITE_GSE_MES  || 1;
+      var corIseo  = jaIseo  >= limIseo  ? '#c62828' : jaIseo >= limIseo-1 ? '#e65100' : '#2e7d32';
+      var corExtra = jaExtra >= limExtra ? '#c62828' : '#2e7d32';
+      infoStatus = '<div style="font-size:9px;display:flex;gap:6px;margin-top:2px">' +
+        '<span style="color:' + corIseo + '">ISEO: ' + jaIseo + '/' + limIseo + (jaIseo >= limIseo ? ' ⛔' : '') + '</span>' +
+        '<span style="color:' + corExtra + '">Extra: ' + jaExtra + '/' + limExtra + (jaExtra >= limExtra ? ' ⛔' : '') + '</span>' +
+      '</div>';
+    }
+
     return '<div onclick="_addMilDaBusca(' + turnoIdx + ',\'' + rgSafe + '\')" ' +
-           'style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--b);display:flex;justify-content:space-between;align-items:center" ' +
+           'style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--b);display:flex;justify-content:space-between;align-items:flex-start" ' +
            'onmouseover="this.style.background=\'var(--s2)\'" onmouseout="this.style.background=\'\'">' +
-           '<span><strong>' + esc(m.posto || '') + '</strong> ' + esc(m.nome || '') + '</span>' +
-           '<span style="font-family:var(--mo);font-size:10px;color:var(--t3)">RG ' + (m.rg || '—') + (m.nf ? ' · NF ' + m.nf : '') + '</span>' +
+           '<div style="flex:1"><strong>' + esc(m.posto || '') + '</strong> ' + esc(m.nome || '') + infoStatus + '</div>' +
+           '<span style="font-family:var(--mo);font-size:10px;color:var(--t3);white-space:nowrap;margin-left:8px">RG ' + (m.rg || '—') + (m.nf ? ' · NF ' + m.nf : '') + '</span>' +
            '</div>';
   }).join('') +
   (filtrados.length > 50 ? '<div style="padding:6px;font-size:10px;color:var(--t3);text-align:center;font-style:italic">+ ' + (filtrados.length - 50) + ' resultados — refine a busca</div>' : '');
@@ -997,6 +1017,15 @@ function salvarEsc() {
     if (conflitos.length) {
       alert(formatarMsgConflito(conflitos));
       return;
+    }
+
+    // ⭐ VALIDAÇÃO DE LIMITE MENSAL (ISEO: máx 4/mês por militar)
+    if (typeof validarLimitesMensais === 'function') {
+      var bloqueiosLim = validarLimitesMensais(d.data, todosMilsEscala, 'iseo', isEditando ? [_editandoEscalaId] : []);
+      if (bloqueiosLim.length) {
+        alert(formatarMsgLimiteMensal(bloqueiosLim, d.data));
+        return;
+      }
     }
   }
 
