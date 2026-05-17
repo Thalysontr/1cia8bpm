@@ -45,6 +45,11 @@ function limparFiltrosEscs() {
 }
 
 function rEscs() {
+  // Calendário ISEO (movido da aba VRTE)
+  if (typeof rCalendarioIseo === 'function') {
+    try { rCalendarioIseo(); } catch (e) { console.error('[rEscs] erro no calendário:', e); }
+  }
+
   var tb = document.getElementById('etb');
   if (!tb) {
     console.warn('[rEscs] elemento #etb não encontrado');

@@ -391,10 +391,33 @@ function _progRenderSimulador() {
   if (!box) return;
 
   var sim = window._PROG_SIM || [];
-  var saldo = (APP.vrte && APP.vrte.saldo) || 0;
+  var saldoTotal = (APP.vrte && APP.vrte.saldo) || 0;
+  var saldoPorOpMap = _progSaldoPorOperacao();
 
-  // Calcula totais
+  // Identifica operações ÚNICAS usadas no simulador
+  var opsUsadas = {};
+  sim.forEach(function(linha) {
+    if (!linha.op) return;
+    var canon = (typeof _opCanonicaFromTipoOp === 'function')
+      ? (_opCanonicaFromTipoOp(linha.op) || linha.op)
+      : linha.op;
+    opsUsadas[canon] = (opsUsadas[canon] || 0);
+  });
+  var nOpsUsadas = Object.keys(opsUsadas).length;
+
+  // Saldo disponível = soma dos saldos das operações usadas (ou total se nenhuma)
+  var saldoDisp = 0;
+  if (nOpsUsadas > 0) {
+    Object.keys(opsUsadas).forEach(function(op) {
+      saldoDisp += (saldoPorOpMap[op] || 0);
+    });
+  } else {
+    saldoDisp = saldoTotal;
+  }
+
+  // Calcula totais (geral) e por operação
   var totalEscalas = 0, totalVRTE = 0, totalMilEsc = 0;
+  var totalPorOp = {}; // canonOp → vrte gasto na simulação
   sim.forEach(function(linha) {
     var qtd = parseInt(linha.qtd, 10) || 0;
     var mils = parseInt(linha.mils, 10) || 0;
@@ -404,11 +427,17 @@ function _progRenderSimulador() {
     totalEscalas += qtd;
     totalVRTE += vrteLinha;
     totalMilEsc += qtd * mils;
+    if (linha.op) {
+      var canon = (typeof _opCanonicaFromTipoOp === 'function')
+        ? (_opCanonicaFromTipoOp(linha.op) || linha.op)
+        : linha.op;
+      totalPorOp[canon] = (totalPorOp[canon] || 0) + vrteLinha;
+    }
   });
 
-  var saldoApos = saldo - totalVRTE;
+  var saldoApos = saldoDisp - totalVRTE;
   var corSaldoApos = saldoApos <= 0 ? '#c62828' : saldoApos < 1000 ? '#e65100' : '#2e7d32';
-  var pctUso = saldo > 0 ? Math.min(100, Math.round((totalVRTE / saldo) * 100)) : 0;
+  var pctUso = saldoDisp > 0 ? Math.min(100, Math.round((totalVRTE / saldoDisp) * 100)) : 0;
   var corPct = pctUso >= 100 ? '#c62828' : pctUso >= 80 ? '#e65100' : pctUso >= 50 ? '#1565c0' : '#2e7d32';
 
   // Opções para dropdown de operação
@@ -442,6 +471,11 @@ function _progRenderSimulador() {
     var vrtePorEsc = mils * (_PROG_VRTE_HORA[horas] || 100);
     var vrteLinha = qtd * vrtePorEsc;
 
+    // Saldo da operação dessa linha
+    var canonOpLinha = linha.op ? ((typeof _opCanonicaFromTipoOp === 'function') ? (_opCanonicaFromTipoOp(linha.op) || linha.op) : linha.op) : '';
+    var saldoOpLinha = canonOpLinha ? (saldoPorOpMap[canonOpLinha] || 0) : 0;
+    var corSaldoOp = saldoOpLinha <= 0 ? '#c62828' : saldoOpLinha < 1000 ? '#e65100' : '#2e7d32';
+
     // Dropdown de operação (com opções existentes + opção "Outra" digitada)
     var opsHtml = '<option value="">— selecione —</option>';
     ops.forEach(function(o) {
@@ -457,6 +491,7 @@ function _progRenderSimulador() {
         '<select onchange="_progSimUpd(' + idx + ',\'op\',this.value)" style="width:100%;padding:5px;font-size:12px">' +
           opsHtml +
         '</select>' +
+        (canonOpLinha ? '<div style="font-size:9px;color:var(--t2);margin-top:3px">Saldo: <strong style="color:' + corSaldoOp + '">' + saldoOpLinha.toLocaleString('pt-BR') + ' VRTE</strong></div>' : '') +
       '</td>' +
       '<td style="padding:4px 6px;text-align:center">' +
         '<input type="number" min="0" value="' + qtd + '" oninput="_progSimUpd(' + idx + ',\'qtd\',this.value)" style="width:70px;text-align:center;padding:5px;font-size:12px"/>' +
@@ -491,13 +526,26 @@ function _progRenderSimulador() {
 
   html += '</tbody></table></div>';
 
+  // Subtitulo do card "Saldo disponível"
+  var subtituloSaldo, opsListaTxt;
+  if (nOpsUsadas === 0) {
+    subtituloSaldo = 'VRTE total (selecione operações abaixo)';
+    opsListaTxt = '';
+  } else {
+    var opsArr = Object.keys(opsUsadas);
+    opsListaTxt = opsArr.join(', ');
+    subtituloSaldo = nOpsUsadas === 1
+      ? 'Saldo de ' + opsArr[0]
+      : 'Soma de ' + nOpsUsadas + ' operações';
+  }
+
   // Resumo visual de saldo
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:14px">' +
 
     '<div style="padding:10px;background:#e3f2fd;border-radius:6px;border-left:4px solid #1565c0">' +
-      '<div style="font-size:9px;font-weight:700;color:var(--t2);text-transform:uppercase">Saldo atual</div>' +
-      '<div style="font-size:22px;font-weight:800;color:#1565c0;line-height:1.1">' + saldo.toLocaleString('pt-BR') + '</div>' +
-      '<div style="font-size:10px;color:var(--t2)">VRTE disponível</div>' +
+      '<div style="font-size:9px;font-weight:700;color:var(--t2);text-transform:uppercase">Saldo disponível</div>' +
+      '<div style="font-size:22px;font-weight:800;color:#1565c0;line-height:1.1">' + saldoDisp.toLocaleString('pt-BR') + '</div>' +
+      '<div style="font-size:10px;color:var(--t2);line-height:1.3">' + esc(subtituloSaldo) + (opsListaTxt ? '<br><span style="font-size:9px;font-style:italic">' + esc(opsListaTxt) + '</span>' : '') + '</div>' +
     '</div>' +
 
     '<div style="padding:10px;background:#ede7f6;border-radius:6px;border-left:4px solid #6a1f6e">' +
@@ -522,11 +570,30 @@ function _progRenderSimulador() {
 
   '</div>';
 
+  // Detalhamento por operação (se mais de 1 operação no simulador)
+  if (nOpsUsadas >= 2) {
+    html += '<div style="margin-top:10px;padding:10px;background:#f5f5f5;border-radius:6px">' +
+      '<div style="font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;margin-bottom:6px">Detalhamento por operação</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px">';
+    Object.keys(opsUsadas).forEach(function(op) {
+      var saldoOp = saldoPorOpMap[op] || 0;
+      var gastoOp = totalPorOp[op] || 0;
+      var sobraOp = saldoOp - gastoOp;
+      var corOp = sobraOp <= 0 ? '#c62828' : sobraOp < 500 ? '#e65100' : '#2e7d32';
+      html += '<div style="padding:6px 8px;background:#fff;border-radius:4px;border-left:3px solid ' + corOp + '">' +
+        '<div style="font-size:10px;font-weight:700">' + esc(op) + '</div>' +
+        '<div style="font-size:10px;color:var(--t2);margin-top:2px">Saldo ' + saldoOp.toLocaleString('pt-BR') + ' − Gasto ' + gastoOp.toLocaleString('pt-BR') + ' = <strong style="color:' + corOp + '">' + sobraOp.toLocaleString('pt-BR') + '</strong></div>' +
+      '</div>';
+    });
+    html += '</div></div>';
+  }
+
   // Aviso se estourou
   if (saldoApos < 0) {
     html += '<div style="margin-top:10px;padding:10px;background:#ffebee;border-left:4px solid #c62828;border-radius:4px;font-size:12px;color:#c62828;font-weight:600">' +
-      '⚠ Atenção: você precisa de ' + Math.abs(saldoApos).toLocaleString('pt-BR') + ' VRTE a mais do que tem em saldo. ' +
-      'Reduza alguma operação ou registre nova entrada de VRTE antes de programar.' +
+      '⚠ Atenção: você precisa de ' + Math.abs(saldoApos).toLocaleString('pt-BR') + ' VRTE a mais do que tem disponível ' +
+      (nOpsUsadas > 0 ? '(somando saldos das operações usadas). ' : 'no saldo total. ') +
+      'Reduza alguma linha ou registre nova entrada de VRTE.' +
     '</div>';
   }
 

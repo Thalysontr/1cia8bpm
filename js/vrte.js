@@ -263,10 +263,8 @@ function rVRTE() {
 
   _renderOpBtns();
 
-  // Calendário ISEO (feature B)
-  if (typeof rCalendarioIseo === 'function') {
-    try { rCalendarioIseo(); } catch (e) { console.error('[rVRTE] erro no calendário:', e); }
-  }
+  // Calendário ISEO foi MOVIDO para a aba "Escalas"
+  // (rCalendarioIseo agora é chamado em rEscs)
 
   // Reatribuição de operações órfãs (correção retroativa)
   if (typeof rVrteReatrib === 'function') {

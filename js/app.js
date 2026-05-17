@@ -17,7 +17,7 @@ var APP = {
 };
 
 // ─── Navegação ──────────────────────────────────────────────────
-var PNL = { painel:'pp', vrte:'pv', ops:'po', nova:'pn', extra:'pextra', prog:'pprog', escalas:'pe', mils:'pm', cfg:'pc', disp:'pdisp', relatorios:'prel', analise:'pana' };
+var PNL = { painel:'pp', vrte:'pv', ops:'po', nova:'pn', prog:'pprog', escalas:'pe', mils:'pm', cfg:'pc', disp:'pdisp', relatorios:'prel', analise:'pana' };
 
 function nav(id, el) {
   document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('on'); });
@@ -39,8 +39,40 @@ function render(id) {
   if (id === 'relatorios' && typeof rRelatorios === 'function') rRelatorios();
   if (id === 'analise'    && typeof rAnalise    === 'function') rAnalise();
   if (id === 'prog'       && typeof rProgramacao === 'function') rProgramacao();
-  if (id === 'extra'      && typeof rExtra      === 'function') rExtra();
+  // Quando entra em Nova Escala, garante que o tipo (ISEO/Extra) está inicializado
+  if (id === 'nova' && typeof selecionarTipoNova === 'function') {
+    // Não força mudança — mantém o tipo atual ou inicializa em ISEO
+    if (!window._NOVA_TIPO_ATUAL) selecionarTipoNova('iseo');
+  }
 }
+
+// ─── Seletor de tipo da aba "Nova Escala" (ISEO ou Extra) ─────
+window._NOVA_TIPO_ATUAL = 'iseo';
+function selecionarTipoNova(tipo) {
+  if (tipo !== 'iseo' && tipo !== 'extra') return;
+  window._NOVA_TIPO_ATUAL = tipo;
+
+  // Mostra/esconde os forms
+  var elIseo = document.getElementById('form-tipo-iseo');
+  var elExtra = document.getElementById('form-tipo-extra');
+  if (elIseo)  elIseo.style.display  = tipo === 'iseo'  ? '' : 'none';
+  if (elExtra) elExtra.style.display = tipo === 'extra' ? '' : 'none';
+
+  // Atualiza estilo dos botões (active)
+  var btnI = document.getElementById('tab-tipo-iseo');
+  var btnE = document.getElementById('tab-tipo-extra');
+  if (btnI) btnI.classList.toggle('bp', tipo === 'iseo');
+  if (btnE) btnE.classList.toggle('bp', tipo === 'extra');
+
+  // Inicializa o form do tipo escolhido
+  if (tipo === 'iseo' && typeof rNova === 'function') {
+    try { rNova(); } catch(e) { /* rNova pode não estar definida */ }
+  }
+  if (tipo === 'extra' && typeof rExtra === 'function') {
+    try { rExtra(); } catch(e) { console.error('[rExtra]', e); }
+  }
+}
+window.selecionarTipoNova = selecionarTipoNova;
 
 // ─── Inicialização — carrega tudo do Firestore antes de renderizar
 function initApp() {
@@ -95,7 +127,12 @@ function aplicarPermissoesUI() {
   _hideNav('cfg',        can('gerenciar_usuarios'));
   _hideNav('analise',    can('ver_analise'));
   _hideNav('prog',       can('ver_programacao'));
-  _hideNav('extra',      true); // todos veem (visualizador só lê; permissões em cada botão)
+
+  // Esconde os botões/abas do form Extra dentro de Nova Escala se o user não pode criar/editar extra
+  if (typeof can === 'function') {
+    var tabExtra = document.getElementById('tab-tipo-extra');
+    if (tabExtra) tabExtra.style.display = can('criar_escala_extra') ? '' : 'none';
+  }
   _hideNav('ops',        can('cadastrar_operacao') || can('ver_painel')); // Operações: todos veem
 
   // Form de cadastrar militar — esconde para quem não pode cadastrar
